@@ -37,22 +37,22 @@ func TestAccSSHFileDataSource(t *testing.T) {
 func testAccSSHFileDataSourceConfig(t *testing.T) string {
 	return fmt.Sprintf(`
 provider "ssh" {
-  host     = "%s"
-  user     = "%s"
-  password = "%s"
+	host     = "%s"
+	user     = "%s"
+	password = "%s"
 }
 
 data "ssh_file" "hostname" {
-  path = "/etc/hostname"
+	path = "/etc/hostname"
 }
 
 data "ssh_file" "missing_optional" {
-  path = "/nonexistent/file"
-  fail_if_absent = false
+	path = "/nonexistent/file"
+	fail_if_absent = false
 }
 
 data "ssh_file" "hosts" {
-  path = "/etc/hosts"
+	path = "/etc/hosts"
 }
 `, getEnvVarOrSkip(t, "SSH_HOST"), getEnvVarOrSkip(t, "SSH_USER"), getEnvVarOrSkip(t, "SSH_PASSWORD"))
 }
@@ -74,14 +74,14 @@ func TestAccSSHFileDataSource_FailIfAbsent(t *testing.T) {
 func testAccSSHFileDataSourceConfigFailIfAbsent(t *testing.T) string {
 	return fmt.Sprintf(`
 provider "ssh" {
-  host     = "%s"
-  user     = "%s"
-  password = "%s"
+	host     = "%s"
+	user     = "%s"
+	password = "%s"
 }
 
 data "ssh_file" "missing_required" {
-  path = "/nonexistent/file"
-  fail_if_absent = true
+	path = "/nonexistent/file"
+	fail_if_absent = true
 }
 `, getEnvVarOrSkip(t, "SSH_HOST"), getEnvVarOrSkip(t, "SSH_USER"), getEnvVarOrSkip(t, "SSH_PASSWORD"))
 }

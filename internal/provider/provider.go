@@ -121,14 +121,18 @@ func (p *SSHProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		sshConfig.Auth = append(sshConfig.Auth, ssh.Password(config.Password.ValueString()))
 	}
 	if !config.PrivateKey.IsNull() {
-		signer, err := ssh.ParsePrivateKey([]byte(config.PrivateKey.ValueString()))
+		keyContent := config.PrivateKey.ValueString()
+
+		// Parse the private key
+		signer, err := ssh.ParsePrivateKey([]byte(keyContent))
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Unable to parse private key",
-				err.Error(),
+				fmt.Sprintf("Private key parsing failed: %v", err),
 			)
 			return
 		}
+
 		sshConfig.Auth = append(sshConfig.Auth, ssh.PublicKeys(signer))
 	}
 

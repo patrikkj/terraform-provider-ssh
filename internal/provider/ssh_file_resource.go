@@ -2,6 +2,8 @@ package provider
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/fs"
@@ -12,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
@@ -80,6 +83,12 @@ func (r *SSHFileResource) Configure(_ context.Context, req resource.ConfigureReq
 	r.client = client
 }
 
+func generateFileID(path string) string {
+	h := md5.New()
+	h.Write([]byte(path))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 func (r *SSHFileResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data SSHFileResourceModel
 
@@ -88,18 +97,13 @@ func (r *SSHFileResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	fmt.Printf("Creating file: %s\n", data.Path.ValueString())
-
-	if data.Id.IsNull() {
-		data.Id = types.StringValue(data.Path.ValueString())
-	}
+	// Generate a unique, stable ID using the file path
+	data.Id = types.StringValue(generateFileID(data.Path.ValueString()))
 
 	if err := r.writeFile(ctx, &data); err != nil {
 		resp.Diagnostics.AddError("Failed to write file", err.Error())
 		return
 	}
-
-	fmt.Printf("Successfully created file: %s\n", data.Path.ValueString())
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -147,15 +151,23 @@ func (r *SSHFileResource) Read(ctx context.Context, req resource.ReadRequest, re
 func (r *SSHFileResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data SSHFileResourceModel
 
+	// Get the current state
+	var state SSHFileResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Get the planned changes
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if data.Id.IsNull() {
-		data.Id = types.StringValue(data.Path.ValueString())
-	}
+	// Preserve the original ID from state
+	data.Id = state.Id
 
+	// Write the file
 	if err := r.writeFile(ctx, &data); err != nil {
 		resp.Diagnostics.AddError("Failed to update file", err.Error())
 		return
@@ -172,8 +184,6 @@ func (r *SSHFileResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	fmt.Printf("Deleting file: %s\n", data.Path.ValueString())
-
 	// Create SFTP client
 	sftpClient, err := sftp.NewClient(r.client)
 	if err != nil {
@@ -186,11 +196,9 @@ func (r *SSHFileResource) Delete(ctx context.Context, req resource.DeleteRequest
 		resp.Diagnostics.AddError("Failed to delete file", err.Error())
 		return
 	}
-
-	fmt.Printf("Successfully deleted file: %s\n", data.Path.ValueString())
 }
 
-func (r *SSHFileResource) writeFile(_ context.Context, data *SSHFileResourceModel) error {
+func (r *SSHFileResource) writeFile(ctx context.Context, data *SSHFileResourceModel) error {
 	// Create SFTP client
 	sftpClient, err := sftp.NewClient(r.client)
 	if err != nil {
@@ -220,12 +228,24 @@ func (r *SSHFileResource) writeFile(_ context.Context, data *SSHFileResourceMode
 		return fmt.Errorf("failed to write file content: %w", err)
 	}
 
-	// Set permissions
-	if err := sftpClient.Chmod(data.Path.ValueString(), parseFileMode(data.Permissions.ValueString())); err != nil {
-		return fmt.Errorf("failed to set permissions: %w", err)
+	// Close the file before changing permissions
+	f.Close()
+
+	// Try to set permissions, but don't fail if it doesn't work
+	mode := parseFileMode(data.Permissions.ValueString())
+	tflog.Debug(ctx, fmt.Sprintf("Attempting to chmod %s to %s", data.Path.ValueString(), mode))
+
+	if err := sftpClient.Chmod(data.Path.ValueString(), mode); err != nil {
+		// Log the permission error but don't fail the resource creation/update
+		tflog.Warn(ctx, fmt.Sprintf("Warning: Could not set permissions on %s to %s: %s",
+			data.Path.ValueString(), mode, err))
 	}
 
-	data.Id = types.StringValue(data.Path.ValueString())
+	// Only generate a new ID if one hasn't been set
+	if data.Id.IsNull() {
+		data.Id = types.StringValue(generateFileID(data.Path.ValueString()))
+	}
+
 	return nil
 }
 

@@ -30,6 +30,18 @@ func TestAccSSHExecDataSource(t *testing.T) {
 					resource.TestCheckResourceAttr("data.ssh_exec.nonzero_allowed", "command", "false"),
 					resource.TestCheckResourceAttr("data.ssh_exec.nonzero_allowed", "exit_code", "1"),
 					resource.TestCheckResourceAttr("data.ssh_exec.nonzero_allowed", "stdout", ""),
+
+					// Multiline command
+					resource.TestCheckResourceAttr("data.ssh_exec.multiline", "exit_code", "0"),
+					resource.TestCheckResourceAttr("data.ssh_exec.multiline", "stdout", "Line 1\nLine 2\n"),
+
+					// Script command
+					resource.TestCheckResourceAttr("data.ssh_exec.script", "exit_code", "0"),
+					resource.TestMatchResourceAttr(
+						"data.ssh_exec.script",
+						"stdout",
+						regexp.MustCompile(`Hello\n-rw-.*\s+test.txt\n`),
+					),
 				),
 			},
 		},
@@ -55,6 +67,26 @@ data "ssh_exec" "whoami" {
 data "ssh_exec" "nonzero_allowed" {
   command = "false"
   fail_if_nonzero = false
+}
+
+data "ssh_exec" "multiline" {
+  command = <<-EOF
+	  echo "Line 1"
+	  echo "Line 2"
+	EOF
+}
+
+data "ssh_exec" "script" {
+  command = <<-EOT
+      #!/bin/bash
+      if [ ! -d "/tmp/test_dir" ]; then
+          mkdir /tmp/test_dir
+      fi
+      cd /tmp/test_dir
+      echo "Hello" > test.txt
+      cat test.txt
+      ls -l test.txt
+    EOT
 }
 `, getEnvVarOrSkip(t, "SSH_HOST"), getEnvVarOrSkip(t, "SSH_USER"), getEnvVarOrSkip(t, "SSH_PASSWORD"))
 }

@@ -2,7 +2,10 @@ package provider
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -26,6 +29,7 @@ type SSHExecResourceModel struct {
 	Output        types.String `tfsdk:"output"`
 	ExitCode      types.Int64  `tfsdk:"exit_code"`
 	FailIfNonzero types.Bool   `tfsdk:"fail_if_nonzero"`
+	OnDestroy     types.String `tfsdk:"on_destroy"`
 	Id            types.String `tfsdk:"id"`
 }
 
@@ -55,6 +59,10 @@ func (r *SSHExecResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Computed:            true,
 				Default:             booldefault.StaticBool(true),
 			},
+			"on_destroy": schema.StringAttribute{
+				MarkdownDescription: "Command to execute when the resource is destroyed",
+				Optional:            true,
+			},
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Unique identifier for this execution",
 				Computed:            true,
@@ -80,6 +88,13 @@ func (r *SSHExecResource) Configure(_ context.Context, req resource.ConfigureReq
 	r.client = client
 }
 
+func generateExecID(command string, timestamp time.Time) string {
+	h := md5.New()
+	h.Write([]byte(command))
+	h.Write([]byte(timestamp.UTC().Format(time.RFC3339)))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 func (r *SSHExecResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data SSHExecResourceModel
 
@@ -95,9 +110,10 @@ func (r *SSHExecResource) Create(ctx context.Context, req resource.CreateRequest
 	if data.ExitCode.IsNull() {
 		data.ExitCode = types.Int64Value(0)
 	}
-	if data.Id.IsNull() {
-		data.Id = types.StringValue(data.Command.ValueString())
-	}
+
+	// Generate a unique, stable ID using command and creation timestamp
+	timestamp := time.Now()
+	data.Id = types.StringValue(generateExecID(data.Command.ValueString(), timestamp))
 
 	if err := r.executeCommand(ctx, &data); err != nil {
 		resp.Diagnostics.AddError("Command execution failed", err.Error())
@@ -122,11 +138,23 @@ func (r *SSHExecResource) Read(ctx context.Context, req resource.ReadRequest, re
 func (r *SSHExecResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data SSHExecResourceModel
 
+	// Get the current state
+	var state SSHExecResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Get the planned changes
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	// Preserve the original ID from state
+	data.Id = state.Id
+
+	// Execute the command
 	if err := r.executeCommand(ctx, &data); err != nil {
 		resp.Diagnostics.AddError("Command execution failed", err.Error())
 		return
@@ -136,7 +164,26 @@ func (r *SSHExecResource) Update(ctx context.Context, req resource.UpdateRequest
 }
 
 func (r *SSHExecResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	// No action needed for delete
+	var data SSHExecResourceModel
+
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// If there's an on_destroy command, execute it
+	if !data.OnDestroy.IsNull() {
+		// Create temporary model for the destroy command
+		destroyData := SSHExecResourceModel{
+			Command:       data.OnDestroy,
+			FailIfNonzero: data.FailIfNonzero,
+		}
+
+		if err := r.executeCommand(ctx, &destroyData); err != nil {
+			resp.Diagnostics.AddError("Failed to execute destroy command", err.Error())
+			return
+		}
+	}
 }
 
 func (r *SSHExecResource) executeCommand(ctx context.Context, data *SSHExecResourceModel) error {
@@ -146,9 +193,6 @@ func (r *SSHExecResource) executeCommand(ctx context.Context, data *SSHExecResou
 	}
 	if data.ExitCode.IsNull() {
 		data.ExitCode = types.Int64Value(0)
-	}
-	if data.Id.IsNull() {
-		data.Id = types.StringValue(data.Command.ValueString())
 	}
 
 	session, err := r.client.NewSession()
@@ -174,7 +218,6 @@ func (r *SSHExecResource) executeCommand(ctx context.Context, data *SSHExecResou
 	}
 
 	data.Output = types.StringValue(string(output))
-	data.Id = types.StringValue(data.Command.ValueString())
 
 	return nil
 }

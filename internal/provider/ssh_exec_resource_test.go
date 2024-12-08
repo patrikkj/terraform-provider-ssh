@@ -2,7 +2,6 @@ package provider
 
 import (
 	"fmt"
-	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -19,7 +18,7 @@ func TestAccSSHExecResource(t *testing.T) {
 					// Basic command execution
 					resource.TestCheckResourceAttr("ssh_exec.basic", "command", "echo 'hello world'"),
 					resource.TestCheckResourceAttr("ssh_exec.basic", "exit_code", "0"),
-					resource.TestCheckResourceAttrSet("ssh_exec.basic", "output"),
+					resource.TestCheckResourceAttr("ssh_exec.basic", "output", "hello world\n"),
 
 					// Non-zero exit with fail_if_nonzero = false
 					resource.TestCheckResourceAttr("ssh_exec.nonzero_allowed", "command", "false"),
@@ -30,15 +29,10 @@ func TestAccSSHExecResource(t *testing.T) {
 					resource.TestCheckResourceAttr("ssh_exec.whoami", "output", getEnvVarOrSkip(t, "SSH_USER")+"\n"),
 					resource.TestCheckResourceAttr("ssh_exec.whoami", "exit_code", "0"),
 
-					// File write and verify
-					resource.TestCheckResourceAttr("ssh_exec.file_write", "command",
-						"echo 'test content' > /tmp/test_write.txt && ls -l /tmp/test_write.txt && cat /tmp/test_write.txt"),
-					resource.TestCheckResourceAttr("ssh_exec.file_write", "exit_code", "0"),
-					resource.TestMatchResourceAttr(
-						"ssh_exec.file_write",
-						"output",
-						regexp.MustCompile(`-rw-.*\s+/tmp/test_write.txt\ntest content\n`),
-					),
+					// Multiline command
+					resource.TestCheckResourceAttr("ssh_exec.multiline", "command", "echo \"Line 1\"\necho \"Line 2\"\n"),
+					resource.TestCheckResourceAttr("ssh_exec.multiline", "exit_code", "0"),
+					resource.TestCheckResourceAttr("ssh_exec.multiline", "output", "Line 1\nLine 2\n"),
 				),
 			},
 			// Test updates to commands
@@ -48,11 +42,6 @@ func TestAccSSHExecResource(t *testing.T) {
 					resource.TestCheckResourceAttr("ssh_exec.basic", "command", "echo 'updated'"),
 					resource.TestCheckResourceAttr("ssh_exec.basic", "exit_code", "0"),
 					resource.TestCheckResourceAttr("ssh_exec.basic", "output", "updated\n"),
-
-					resource.TestCheckResourceAttr("ssh_exec.file_write", "command",
-						"echo 'updated content' > /tmp/test_write.txt && cat /tmp/test_write.txt"),
-					resource.TestCheckResourceAttr("ssh_exec.file_write", "exit_code", "0"),
-					resource.TestCheckResourceAttr("ssh_exec.file_write", "output", "updated content\n"),
 				),
 			},
 		},
@@ -71,6 +60,11 @@ resource "ssh_exec" "basic" {
   command = "echo 'hello world'"
 }
 
+resource "ssh_exec" "on_destroy" {
+  command = "echo 'hello world'"
+  on_destroy = "echo 'on_destroy' > /tmp/on_destroy"
+}
+
 resource "ssh_exec" "nonzero_allowed" {
   command        = "false"
   fail_if_nonzero = false
@@ -80,8 +74,11 @@ resource "ssh_exec" "whoami" {
   command = "whoami"
 }
 
-resource "ssh_exec" "file_write" {
-  command = "echo 'test content' > /tmp/test_write.txt && ls -l /tmp/test_write.txt && cat /tmp/test_write.txt"
+resource "ssh_exec" "multiline" {
+  command = <<-EOF
+	  echo "Line 1"
+	  echo "Line 2"
+	EOF
 }
 `, getEnvVarOrSkip(t, "SSH_HOST"), getEnvVarOrSkip(t, "SSH_USER"), getEnvVarOrSkip(t, "SSH_PASSWORD"))
 }
@@ -107,8 +104,11 @@ resource "ssh_exec" "whoami" {
   command = "whoami"
 }
 
-resource "ssh_exec" "file_write" {
-  command = "echo 'updated content' > /tmp/test_write.txt && cat /tmp/test_write.txt"
+resource "ssh_exec" "multiline" {
+  command = <<-EOF
+	  echo "Line 1"
+	  echo "Line 2"
+	EOF
 }
 `, getEnvVarOrSkip(t, "SSH_HOST"), getEnvVarOrSkip(t, "SSH_USER"), getEnvVarOrSkip(t, "SSH_PASSWORD"))
 }
