@@ -9,7 +9,10 @@ require (
 	github.com/hashicorp/terraform-plugin-testing v1.11.0
 )
 
-require github.com/kr/fs v0.1.0 // indirect
+require (
+	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/kr/fs v0.1.0 // indirect
+)
 
 require (
 	github.com/ProtonMail/go-crypto v1.1.0-alpha.2 // indirect

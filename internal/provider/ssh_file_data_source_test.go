@@ -94,3 +94,45 @@ func getEnvVarOrSkip(t *testing.T, name string) string {
 	}
 	return value
 }
+
+// Add this new test function
+func TestAccSSHFileDataSource_PrivateKey(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckPrivateKey(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSSHFileDataSourceConfigPrivateKey(t),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Test reading an existing file
+					resource.TestCheckResourceAttr("data.ssh_file.hostname", "path", "/etc/hostname"),
+					resource.TestCheckResourceAttrSet("data.ssh_file.hostname", "content"),
+
+					// Test reading /etc/hosts file
+					resource.TestCheckResourceAttr("data.ssh_file.hosts", "path", "/etc/hosts"),
+					resource.TestCheckResourceAttrSet("data.ssh_file.hosts", "content"),
+				),
+			},
+		},
+	})
+}
+
+func testAccSSHFileDataSourceConfigPrivateKey(t *testing.T) string {
+	return fmt.Sprintf(`
+provider "ssh" {
+	host        = "%s"
+	user        = "%s"
+	private_key = file("%s")
+}
+
+data "ssh_file" "hostname" {
+	path = "/etc/hostname"
+}
+
+data "ssh_file" "hosts" {
+	path = "/etc/hosts"
+}
+`, getEnvVarOrSkip(t, "SSH_HOST"),
+		getEnvVarOrSkip(t, "SSH_USER"),
+		getEnvVarOrSkip(t, "SSH_PRIVATE_KEY_PATH"))
+}
