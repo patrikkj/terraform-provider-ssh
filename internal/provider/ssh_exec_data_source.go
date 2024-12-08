@@ -17,15 +17,20 @@ func NewSSHExecDataSource() datasource.DataSource {
 }
 
 type SSHExecDataSource struct {
-	client *ssh.Client
+	manager *SSHManager
 }
 
 type SSHExecDataSourceModel struct {
-	Command       types.String `tfsdk:"command"`
-	Stdout        types.String `tfsdk:"stdout"`
-	ExitCode      types.Int64  `tfsdk:"exit_code"`
-	FailIfNonzero types.Bool   `tfsdk:"fail_if_nonzero"`
-	Id            types.String `tfsdk:"id"`
+	Command              types.String `tfsdk:"command"`
+	Output               types.String `tfsdk:"output"`
+	ExitCode             types.Int64  `tfsdk:"exit_code"`
+	FailIfNonzero        types.Bool   `tfsdk:"fail_if_nonzero"`
+	Id                   types.String `tfsdk:"id"`
+	Host                 types.String `tfsdk:"host"`
+	User                 types.String `tfsdk:"user"`
+	Password             types.String `tfsdk:"password"`
+	PrivateKey           types.String `tfsdk:"private_key"`
+	UseProviderAsBastion types.Bool   `tfsdk:"use_provider_as_bastion"`
 }
 
 func (d *SSHExecDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -33,30 +38,38 @@ func (d *SSHExecDataSource) Metadata(_ context.Context, req datasource.MetadataR
 }
 
 func (d *SSHExecDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	// Create specific attributes
+	attributes := map[string]schema.Attribute{
+		"command": schema.StringAttribute{
+			MarkdownDescription: "Command to execute",
+			Required:            true,
+		},
+		"output": schema.StringAttribute{
+			MarkdownDescription: "Output of the command",
+			Computed:            true,
+		},
+		"exit_code": schema.Int64Attribute{
+			MarkdownDescription: "Exit code of the command",
+			Computed:            true,
+		},
+		"fail_if_nonzero": schema.BoolAttribute{
+			MarkdownDescription: "Whether to fail if the command returns a non-zero exit code",
+			Optional:            true,
+		},
+		"id": schema.StringAttribute{
+			MarkdownDescription: "Unique identifier for this execution",
+			Computed:            true,
+		},
+	}
+
+	// Merge with common SSH connection attributes
+	for k, v := range GetCommonSSHConnectionSchema() {
+		attributes[k] = v
+	}
+
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Execute commands over SSH",
-		Attributes: map[string]schema.Attribute{
-			"command": schema.StringAttribute{
-				MarkdownDescription: "Command to execute",
-				Required:            true,
-			},
-			"stdout": schema.StringAttribute{
-				MarkdownDescription: "Output of the command",
-				Computed:            true,
-			},
-			"exit_code": schema.Int64Attribute{
-				MarkdownDescription: "Exit code of the command",
-				Computed:            true,
-			},
-			"fail_if_nonzero": schema.BoolAttribute{
-				MarkdownDescription: "Whether to fail if the command returns a non-zero exit code",
-				Optional:            true,
-			},
-			"id": schema.StringAttribute{
-				MarkdownDescription: "Unique identifier for this execution",
-				Computed:            true,
-			},
-		},
+		Attributes:          attributes,
 	}
 }
 
@@ -65,16 +78,16 @@ func (d *SSHExecDataSource) Configure(_ context.Context, req datasource.Configur
 		return
 	}
 
-	client, ok := req.ProviderData.(*ssh.Client)
+	manager, ok := req.ProviderData.(*SSHManager)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected *ssh.Client, got: %T", req.ProviderData),
+			fmt.Sprintf("Expected *SSHManager, got: %T", req.ProviderData),
 		)
 		return
 	}
 
-	d.client = client
+	d.manager = manager
 }
 
 func (d *SSHExecDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -90,7 +103,24 @@ func (d *SSHExecDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		data.FailIfNonzero = types.BoolValue(true)
 	}
 
-	session, err := d.client.NewSession()
+	client, newClient, err := d.manager.GetClient(&SSHConnectionConfig{
+		Host:                 data.Host,
+		User:                 data.User,
+		Password:             data.Password,
+		PrivateKey:           data.PrivateKey,
+		UseProviderAsBastion: data.UseProviderAsBastion,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to get SSH client", err.Error())
+		return
+	}
+
+	// If we created a new client, close it when done
+	if newClient {
+		defer client.Close()
+	}
+
+	session, err := client.NewSession()
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create SSH session", err.Error())
 		return
@@ -103,7 +133,7 @@ func (d *SSHExecDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		if exitErr, ok := err.(*ssh.ExitError); ok {
 			exitCode := int64(exitErr.ExitStatus())
 			data.ExitCode = types.Int64Value(exitCode)
-			data.Stdout = types.StringValue(string(output))
+			data.Output = types.StringValue(string(output))
 			if data.FailIfNonzero.ValueBool() && exitCode != 0 {
 				resp.Diagnostics.AddError("Command exited with non-zero status",
 					fmt.Sprintf("Exit code: %d, Output: %s", exitCode, output))
@@ -115,7 +145,7 @@ func (d *SSHExecDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		}
 	} else {
 		data.ExitCode = types.Int64Value(0)
-		data.Stdout = types.StringValue(string(output))
+		data.Output = types.StringValue(string(output))
 	}
 
 	data.Id = types.StringValue(fmt.Sprintf("%s-%d", data.Command.ValueString(), data.ExitCode.ValueInt64()))

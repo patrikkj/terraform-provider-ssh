@@ -21,16 +21,21 @@ func NewSSHExecResource() resource.Resource {
 }
 
 type SSHExecResource struct {
-	client *ssh.Client
+	manager *SSHManager
 }
 
 type SSHExecResourceModel struct {
-	Command       types.String `tfsdk:"command"`
-	Output        types.String `tfsdk:"output"`
-	ExitCode      types.Int64  `tfsdk:"exit_code"`
-	FailIfNonzero types.Bool   `tfsdk:"fail_if_nonzero"`
-	OnDestroy     types.String `tfsdk:"on_destroy"`
-	Id            types.String `tfsdk:"id"`
+	Command              types.String `tfsdk:"command"`
+	Output               types.String `tfsdk:"output"`
+	ExitCode             types.Int64  `tfsdk:"exit_code"`
+	FailIfNonzero        types.Bool   `tfsdk:"fail_if_nonzero"`
+	OnDestroy            types.String `tfsdk:"on_destroy"`
+	Id                   types.String `tfsdk:"id"`
+	Host                 types.String `tfsdk:"host"`
+	User                 types.String `tfsdk:"user"`
+	Password             types.String `tfsdk:"password"`
+	PrivateKey           types.String `tfsdk:"private_key"`
+	UseProviderAsBastion types.Bool   `tfsdk:"use_provider_as_bastion"`
 }
 
 func (r *SSHExecResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -38,36 +43,44 @@ func (r *SSHExecResource) Metadata(_ context.Context, req resource.MetadataReque
 }
 
 func (r *SSHExecResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	// Create specific attributes
+	attributes := map[string]schema.Attribute{
+		"command": schema.StringAttribute{
+			MarkdownDescription: "Command to execute",
+			Required:            true,
+		},
+		"output": schema.StringAttribute{
+			MarkdownDescription: "Output of the command",
+			Computed:            true,
+		},
+		"exit_code": schema.Int64Attribute{
+			MarkdownDescription: "Exit code of the command",
+			Computed:            true,
+		},
+		"fail_if_nonzero": schema.BoolAttribute{
+			MarkdownDescription: "Whether to fail if the command returns a non-zero exit code. Defaults to true if not specified.",
+			Optional:            true,
+			Computed:            true,
+			Default:             booldefault.StaticBool(true),
+		},
+		"on_destroy": schema.StringAttribute{
+			MarkdownDescription: "Command to execute when the resource is destroyed",
+			Optional:            true,
+		},
+		"id": schema.StringAttribute{
+			MarkdownDescription: "Unique identifier for this execution",
+			Computed:            true,
+		},
+	}
+
+	// Merge with common SSH connection attributes
+	for k, v := range GetCommonSSHConnectionSchema() {
+		attributes[k] = v
+	}
+
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Execute commands over SSH with potential side effects",
-		Attributes: map[string]schema.Attribute{
-			"command": schema.StringAttribute{
-				MarkdownDescription: "Command to execute",
-				Required:            true,
-			},
-			"output": schema.StringAttribute{
-				MarkdownDescription: "Output of the command",
-				Computed:            true,
-			},
-			"exit_code": schema.Int64Attribute{
-				MarkdownDescription: "Exit code of the command",
-				Computed:            true,
-			},
-			"fail_if_nonzero": schema.BoolAttribute{
-				MarkdownDescription: "Whether to fail if the command returns a non-zero exit code. Defaults to true if not specified.",
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(true),
-			},
-			"on_destroy": schema.StringAttribute{
-				MarkdownDescription: "Command to execute when the resource is destroyed",
-				Optional:            true,
-			},
-			"id": schema.StringAttribute{
-				MarkdownDescription: "Unique identifier for this execution",
-				Computed:            true,
-			},
-		},
+		Attributes:          attributes,
 	}
 }
 
@@ -76,16 +89,16 @@ func (r *SSHExecResource) Configure(_ context.Context, req resource.ConfigureReq
 		return
 	}
 
-	client, ok := req.ProviderData.(*ssh.Client)
+	manager, ok := req.ProviderData.(*SSHManager)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *ssh.Client, got: %T", req.ProviderData),
+			fmt.Sprintf("Expected *SSHManager, got: %T", req.ProviderData),
 		)
 		return
 	}
 
-	r.client = client
+	r.manager = manager
 }
 
 func generateExecID(command string, timestamp time.Time) string {
@@ -187,15 +200,23 @@ func (r *SSHExecResource) Delete(ctx context.Context, req resource.DeleteRequest
 }
 
 func (r *SSHExecResource) executeCommand(ctx context.Context, data *SSHExecResourceModel) error {
-	// Set default values for computed fields
-	if data.Output.IsNull() {
-		data.Output = types.StringValue("")
-	}
-	if data.ExitCode.IsNull() {
-		data.ExitCode = types.Int64Value(0)
+	client, newClient, err := r.manager.GetClient(&SSHConnectionConfig{
+		Host:                 data.Host,
+		User:                 data.User,
+		Password:             data.Password,
+		PrivateKey:           data.PrivateKey,
+		UseProviderAsBastion: data.UseProviderAsBastion,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get SSH client: %w", err)
 	}
 
-	session, err := r.client.NewSession()
+	// If we created a new client, close it when done
+	if newClient {
+		defer client.Close()
+	}
+
+	session, err := client.NewSession()
 	if err != nil {
 		return fmt.Errorf("failed to create SSH session: %w", err)
 	}

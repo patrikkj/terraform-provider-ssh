@@ -23,6 +23,7 @@ var _ provider.ProviderWithFunctions = &SSHProvider{}
 
 type SSHProvider struct {
 	version string
+	manager *SSHManager
 }
 
 type SSHProviderModel struct {
@@ -146,9 +147,12 @@ func (p *SSHProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		return
 	}
 
-	// Store the client in the response
-	resp.DataSourceData = client
-	resp.ResourceData = client
+	// Create the SSH manager
+	p.manager = NewSSHManager(client)
+
+	// Store both the client and manager in the response
+	resp.DataSourceData = p.manager
+	resp.ResourceData = p.manager
 }
 
 func createSSHClient(config SSHProviderModel, sshConfig *ssh.ClientConfig) (*ssh.Client, error) {

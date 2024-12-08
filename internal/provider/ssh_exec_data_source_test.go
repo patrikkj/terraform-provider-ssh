@@ -19,27 +19,27 @@ func TestAccSSHExecDataSource(t *testing.T) {
 					// Basic command execution
 					resource.TestCheckResourceAttr("data.ssh_exec.basic", "command", "echo hi"),
 					resource.TestCheckResourceAttr("data.ssh_exec.basic", "exit_code", "0"),
-					resource.TestCheckResourceAttr("data.ssh_exec.basic", "stdout", "hi\n"),
+					resource.TestCheckResourceAttr("data.ssh_exec.basic", "output", "hi\n"),
 
 					// Whoami command
 					resource.TestCheckResourceAttr("data.ssh_exec.whoami", "command", "whoami"),
-					resource.TestCheckResourceAttr("data.ssh_exec.whoami", "stdout", getEnvVarOrSkip(t, "SSH_USER")+"\n"),
+					resource.TestCheckResourceAttr("data.ssh_exec.whoami", "output", getEnvVarOrSkip(t, "SSH_USER")+"\n"),
 					resource.TestCheckResourceAttr("data.ssh_exec.whoami", "exit_code", "0"),
 
 					// Non-zero exit with fail_if_nonzero = false
 					resource.TestCheckResourceAttr("data.ssh_exec.nonzero_allowed", "command", "false"),
 					resource.TestCheckResourceAttr("data.ssh_exec.nonzero_allowed", "exit_code", "1"),
-					resource.TestCheckResourceAttr("data.ssh_exec.nonzero_allowed", "stdout", ""),
+					resource.TestCheckResourceAttr("data.ssh_exec.nonzero_allowed", "output", ""),
 
 					// Multiline command
 					resource.TestCheckResourceAttr("data.ssh_exec.multiline", "exit_code", "0"),
-					resource.TestCheckResourceAttr("data.ssh_exec.multiline", "stdout", "Line 1\nLine 2\n"),
+					resource.TestCheckResourceAttr("data.ssh_exec.multiline", "output", "Line 1\nLine 2\n"),
 
 					// Script command
 					resource.TestCheckResourceAttr("data.ssh_exec.script", "exit_code", "0"),
 					resource.TestMatchResourceAttr(
 						"data.ssh_exec.script",
-						"stdout",
+						"output",
 						regexp.MustCompile(`Hello\n-rw-.*\s+test.txt\n`),
 					),
 				),
@@ -132,11 +132,11 @@ func TestAccSSHExecDataSource_PrivateKey(t *testing.T) {
 					// Basic command execution
 					resource.TestCheckResourceAttr("data.ssh_exec.basic", "command", "echo hi"),
 					resource.TestCheckResourceAttr("data.ssh_exec.basic", "exit_code", "0"),
-					resource.TestCheckResourceAttr("data.ssh_exec.basic", "stdout", "hi\n"),
+					resource.TestCheckResourceAttr("data.ssh_exec.basic", "output", "hi\n"),
 
 					// Whoami command
 					resource.TestCheckResourceAttr("data.ssh_exec.whoami", "command", "whoami"),
-					resource.TestCheckResourceAttr("data.ssh_exec.whoami", "stdout", getEnvVarOrSkip(t, "SSH_USER")+"\n"),
+					resource.TestCheckResourceAttr("data.ssh_exec.whoami", "output", getEnvVarOrSkip(t, "SSH_USER")+"\n"),
 					resource.TestCheckResourceAttr("data.ssh_exec.whoami", "exit_code", "0"),
 				),
 			},

@@ -9,7 +9,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/pkg/sftp"
-	"golang.org/x/crypto/ssh"
 )
 
 var _ datasource.DataSource = &SSHFileDataSource{}
@@ -19,14 +18,19 @@ func NewSSHFileDataSource() datasource.DataSource {
 }
 
 type SSHFileDataSource struct {
-	client *ssh.Client
+	manager *SSHManager
 }
 
 type SSHFileDataSourceModel struct {
-	Path         types.String `tfsdk:"path"`
-	Content      types.String `tfsdk:"content"`
-	FailIfAbsent types.Bool   `tfsdk:"fail_if_absent"`
-	Id           types.String `tfsdk:"id"`
+	Path                 types.String `tfsdk:"path"`
+	Content              types.String `tfsdk:"content"`
+	FailIfAbsent         types.Bool   `tfsdk:"fail_if_absent"`
+	Id                   types.String `tfsdk:"id"`
+	Host                 types.String `tfsdk:"host"`
+	User                 types.String `tfsdk:"user"`
+	Password             types.String `tfsdk:"password"`
+	PrivateKey           types.String `tfsdk:"private_key"`
+	UseProviderAsBastion types.Bool   `tfsdk:"use_provider_as_bastion"`
 }
 
 func (d *SSHFileDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -34,26 +38,34 @@ func (d *SSHFileDataSource) Metadata(_ context.Context, req datasource.MetadataR
 }
 
 func (d *SSHFileDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	// Create specific attributes
+	attributes := map[string]schema.Attribute{
+		"path": schema.StringAttribute{
+			MarkdownDescription: "Path to the file to read",
+			Required:            true,
+		},
+		"content": schema.StringAttribute{
+			MarkdownDescription: "Content of the file",
+			Computed:            true,
+		},
+		"fail_if_absent": schema.BoolAttribute{
+			MarkdownDescription: "Fail if the file does not exist",
+			Optional:            true,
+		},
+		"id": schema.StringAttribute{
+			MarkdownDescription: "Unique identifier for this file read",
+			Computed:            true,
+		},
+	}
+
+	// Merge with common SSH connection attributes
+	for k, v := range GetCommonSSHConnectionSchema() {
+		attributes[k] = v
+	}
+
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Read files over SSH",
-		Attributes: map[string]schema.Attribute{
-			"path": schema.StringAttribute{
-				MarkdownDescription: "Path to the file to read",
-				Required:            true,
-			},
-			"fail_if_absent": schema.BoolAttribute{
-				MarkdownDescription: "Fail if the file does not exist",
-				Optional:            true,
-			},
-			"content": schema.StringAttribute{
-				MarkdownDescription: "Content of the file",
-				Computed:            true,
-			},
-			"id": schema.StringAttribute{
-				MarkdownDescription: "Unique identifier for this file read",
-				Computed:            true,
-			},
-		},
+		Attributes:          attributes,
 	}
 }
 
@@ -62,28 +74,45 @@ func (d *SSHFileDataSource) Configure(_ context.Context, req datasource.Configur
 		return
 	}
 
-	client, ok := req.ProviderData.(*ssh.Client)
+	manager, ok := req.ProviderData.(*SSHManager)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected *ssh.Client, got: %T", req.ProviderData),
+			fmt.Sprintf("Expected *SSHManager, got: %T", req.ProviderData),
 		)
 		return
 	}
 
-	d.client = client
+	d.manager = manager
 }
 
 func (d *SSHFileDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data SSHFileDataSourceModel
 
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	client, newClient, err := d.manager.GetClient(&SSHConnectionConfig{
+		Host:                 data.Host,
+		User:                 data.User,
+		Password:             data.Password,
+		PrivateKey:           data.PrivateKey,
+		UseProviderAsBastion: data.UseProviderAsBastion,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to get SSH client", err.Error())
+		return
+	}
+
+	// If we created a new client, close it when done
+	if newClient {
+		defer client.Close()
+	}
+
 	// Create SFTP client
-	sftpClient, err := sftp.NewClient(d.client)
+	sftpClient, err := sftp.NewClient(client)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create SFTP client", err.Error())
 		return
