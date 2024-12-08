@@ -21,18 +21,6 @@ type SSHFileDataSource struct {
 	manager *SSHManager
 }
 
-type SSHFileDataSourceModel struct {
-	Path                 types.String `tfsdk:"path"`
-	Content              types.String `tfsdk:"content"`
-	FailIfAbsent         types.Bool   `tfsdk:"fail_if_absent"`
-	Id                   types.String `tfsdk:"id"`
-	Host                 types.String `tfsdk:"host"`
-	User                 types.String `tfsdk:"user"`
-	Password             types.String `tfsdk:"password"`
-	PrivateKey           types.String `tfsdk:"private_key"`
-	UseProviderAsBastion types.Bool   `tfsdk:"use_provider_as_bastion"`
-}
-
 func (d *SSHFileDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_file"
 }
@@ -87,9 +75,9 @@ func (d *SSHFileDataSource) Configure(_ context.Context, req datasource.Configur
 }
 
 func (d *SSHFileDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data SSHFileDataSourceModel
+	var data SSHFileModel
 
-	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}

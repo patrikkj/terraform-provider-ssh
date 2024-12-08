@@ -20,19 +20,6 @@ type SSHExecDataSource struct {
 	manager *SSHManager
 }
 
-type SSHExecDataSourceModel struct {
-	Command              types.String `tfsdk:"command"`
-	Output               types.String `tfsdk:"output"`
-	ExitCode             types.Int64  `tfsdk:"exit_code"`
-	FailIfNonzero        types.Bool   `tfsdk:"fail_if_nonzero"`
-	Id                   types.String `tfsdk:"id"`
-	Host                 types.String `tfsdk:"host"`
-	User                 types.String `tfsdk:"user"`
-	Password             types.String `tfsdk:"password"`
-	PrivateKey           types.String `tfsdk:"private_key"`
-	UseProviderAsBastion types.Bool   `tfsdk:"use_provider_as_bastion"`
-}
-
 func (d *SSHExecDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_exec"
 }
@@ -91,7 +78,7 @@ func (d *SSHExecDataSource) Configure(_ context.Context, req datasource.Configur
 }
 
 func (d *SSHExecDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data SSHExecDataSourceModel
+	var data SSHExecModel
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {

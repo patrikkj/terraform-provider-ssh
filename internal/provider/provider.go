@@ -26,19 +26,6 @@ type SSHProvider struct {
 	manager *SSHManager
 }
 
-type SSHProviderModel struct {
-	Host              types.String `tfsdk:"host"`
-	Port              types.Int64  `tfsdk:"port"`
-	User              types.String `tfsdk:"user"`
-	Password          types.String `tfsdk:"password"`
-	PrivateKey        types.String `tfsdk:"private_key"`
-	BastionHost       types.String `tfsdk:"bastion_host"`
-	BastionPort       types.Int64  `tfsdk:"bastion_port"`
-	BastionUser       types.String `tfsdk:"bastion_user"`
-	BastionPassword   types.String `tfsdk:"bastion_password"`
-	BastionPrivateKey types.String `tfsdk:"bastion_private_key"`
-}
-
 func (p *SSHProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
 	resp.TypeName = "ssh"
 	resp.Version = p.version

@@ -9,7 +9,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"golang.org/x/crypto/ssh"
 )
@@ -24,63 +23,14 @@ type SSHExecResource struct {
 	manager *SSHManager
 }
 
-type SSHExecResourceModel struct {
-	Command              types.String `tfsdk:"command"`
-	Output               types.String `tfsdk:"output"`
-	ExitCode             types.Int64  `tfsdk:"exit_code"`
-	FailIfNonzero        types.Bool   `tfsdk:"fail_if_nonzero"`
-	OnDestroy            types.String `tfsdk:"on_destroy"`
-	Id                   types.String `tfsdk:"id"`
-	Host                 types.String `tfsdk:"host"`
-	User                 types.String `tfsdk:"user"`
-	Password             types.String `tfsdk:"password"`
-	PrivateKey           types.String `tfsdk:"private_key"`
-	UseProviderAsBastion types.Bool   `tfsdk:"use_provider_as_bastion"`
-}
-
 func (r *SSHExecResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_exec"
 }
 
 func (r *SSHExecResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	// Create specific attributes
-	attributes := map[string]schema.Attribute{
-		"command": schema.StringAttribute{
-			MarkdownDescription: "Command to execute",
-			Required:            true,
-		},
-		"output": schema.StringAttribute{
-			MarkdownDescription: "Output of the command",
-			Computed:            true,
-		},
-		"exit_code": schema.Int64Attribute{
-			MarkdownDescription: "Exit code of the command",
-			Computed:            true,
-		},
-		"fail_if_nonzero": schema.BoolAttribute{
-			MarkdownDescription: "Whether to fail if the command returns a non-zero exit code. Defaults to true if not specified.",
-			Optional:            true,
-			Computed:            true,
-			Default:             booldefault.StaticBool(true),
-		},
-		"on_destroy": schema.StringAttribute{
-			MarkdownDescription: "Command to execute when the resource is destroyed",
-			Optional:            true,
-		},
-		"id": schema.StringAttribute{
-			MarkdownDescription: "Unique identifier for this execution",
-			Computed:            true,
-		},
-	}
-
-	// Merge with common SSH connection attributes
-	for k, v := range GetCommonSSHConnectionSchema() {
-		attributes[k] = v
-	}
-
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Execute commands over SSH with potential side effects",
-		Attributes:          attributes,
+		Attributes:          GetSSHExecSchema(),
 	}
 }
 
@@ -109,7 +59,7 @@ func generateExecID(command string, timestamp time.Time) string {
 }
 
 func (r *SSHExecResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data SSHExecResourceModel
+	var data SSHExecModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -137,7 +87,7 @@ func (r *SSHExecResource) Create(ctx context.Context, req resource.CreateRequest
 }
 
 func (r *SSHExecResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data SSHExecResourceModel
+	var data SSHExecModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -149,10 +99,10 @@ func (r *SSHExecResource) Read(ctx context.Context, req resource.ReadRequest, re
 }
 
 func (r *SSHExecResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data SSHExecResourceModel
+	var data SSHExecModel
 
 	// Get the current state
-	var state SSHExecResourceModel
+	var state SSHExecModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -177,7 +127,7 @@ func (r *SSHExecResource) Update(ctx context.Context, req resource.UpdateRequest
 }
 
 func (r *SSHExecResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data SSHExecResourceModel
+	var data SSHExecModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -187,7 +137,7 @@ func (r *SSHExecResource) Delete(ctx context.Context, req resource.DeleteRequest
 	// If there's an on_destroy command, execute it
 	if !data.OnDestroy.IsNull() {
 		// Create temporary model for the destroy command
-		destroyData := SSHExecResourceModel{
+		destroyData := SSHExecModel{
 			Command:       data.OnDestroy,
 			FailIfNonzero: data.FailIfNonzero,
 		}
@@ -199,7 +149,7 @@ func (r *SSHExecResource) Delete(ctx context.Context, req resource.DeleteRequest
 	}
 }
 
-func (r *SSHExecResource) executeCommand(ctx context.Context, data *SSHExecResourceModel) error {
+func (r *SSHExecResource) executeCommand(ctx context.Context, data *SSHExecModel) error {
 	client, newClient, err := r.manager.GetClient(&SSHConnectionConfig{
 		Host:                 data.Host,
 		User:                 data.User,

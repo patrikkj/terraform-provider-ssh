@@ -4,20 +4,19 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"golang.org/x/crypto/ssh"
 )
 
 // SSHManager handles SSH connections for the provider
 type SSHManager struct {
-	providerClient *ssh.Client
+	Client *ssh.Client
 }
 
 // NewSSHManager creates a new SSH connection manager
 func NewSSHManager(providerClient *ssh.Client) *SSHManager {
 	return &SSHManager{
-		providerClient: providerClient,
+		Client: providerClient,
 	}
 }
 
@@ -34,7 +33,7 @@ func (m *SSHManager) GetClient(config *SSHConnectionConfig) (*ssh.Client, bool, 
 	// If no override credentials are provided, return the provider's client
 	if config.Host.IsNull() && config.User.IsNull() && config.Password.IsNull() && config.PrivateKey.IsNull() &&
 		(config.UseProviderAsBastion.IsNull() || !config.UseProviderAsBastion.ValueBool()) {
-		return m.providerClient, false, nil
+		return m.Client, false, nil
 	}
 
 	// Create SSH config for the target
@@ -59,7 +58,7 @@ func (m *SSHManager) GetClient(config *SSHConnectionConfig) (*ssh.Client, bool, 
 	if !config.UseProviderAsBastion.IsNull() && config.UseProviderAsBastion.ValueBool() {
 		targetHost := net.JoinHostPort(config.Host.ValueString(), "22")
 
-		conn, err := m.providerClient.Dial("tcp", targetHost)
+		conn, err := m.Client.Dial("tcp", targetHost)
 		if err != nil {
 			return nil, false, fmt.Errorf("failed to connect through bastion: %w", err)
 		}
@@ -75,31 +74,4 @@ func (m *SSHManager) GetClient(config *SSHConnectionConfig) (*ssh.Client, bool, 
 	// Direct connection
 	client, err := ssh.Dial("tcp", net.JoinHostPort(config.Host.ValueString(), "22"), sshConfig)
 	return client, true, err
-}
-
-func GetCommonSSHConnectionSchema() map[string]schema.Attribute {
-	return map[string]schema.Attribute{
-		"host": schema.StringAttribute{
-			MarkdownDescription: "Override the provider's host configuration",
-			Optional:            true,
-		},
-		"user": schema.StringAttribute{
-			MarkdownDescription: "Override the provider's user configuration",
-			Optional:            true,
-		},
-		"password": schema.StringAttribute{
-			MarkdownDescription: "Override the provider's password configuration",
-			Optional:            true,
-			Sensitive:           true,
-		},
-		"private_key": schema.StringAttribute{
-			MarkdownDescription: "Override the provider's private key configuration",
-			Optional:            true,
-			Sensitive:           true,
-		},
-		"use_provider_as_bastion": schema.BoolAttribute{
-			MarkdownDescription: "Use the provider's connection as a bastion host",
-			Optional:            true,
-		},
-	}
 }

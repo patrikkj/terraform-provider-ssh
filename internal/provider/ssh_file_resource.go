@@ -12,7 +12,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/pkg/sftp"
@@ -28,53 +27,14 @@ type SSHFileResource struct {
 	manager *SSHManager
 }
 
-type SSHFileResourceModel struct {
-	Path                 types.String `tfsdk:"path"`
-	Content              types.String `tfsdk:"content"`
-	Permissions          types.String `tfsdk:"permissions"`
-	Id                   types.String `tfsdk:"id"`
-	Host                 types.String `tfsdk:"host"`
-	User                 types.String `tfsdk:"user"`
-	Password             types.String `tfsdk:"password"`
-	PrivateKey           types.String `tfsdk:"private_key"`
-	UseProviderAsBastion types.Bool   `tfsdk:"use_provider_as_bastion"`
-}
-
 func (r *SSHFileResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_file"
 }
 
 func (r *SSHFileResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	// Create specific attributes
-	attributes := map[string]schema.Attribute{
-		"path": schema.StringAttribute{
-			MarkdownDescription: "Path to the file",
-			Required:            true,
-		},
-		"content": schema.StringAttribute{
-			MarkdownDescription: "Content to write to the file",
-			Required:            true,
-		},
-		"permissions": schema.StringAttribute{
-			MarkdownDescription: "File permissions (e.g., '0644')",
-			Optional:            true,
-			Computed:            true,
-			Default:             stringdefault.StaticString("0644"),
-		},
-		"id": schema.StringAttribute{
-			MarkdownDescription: "Unique identifier for this file",
-			Computed:            true,
-		},
-	}
-
-	// Merge with common SSH connection attributes
-	for k, v := range GetCommonSSHConnectionSchema() {
-		attributes[k] = v
-	}
-
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manage files over SSH",
-		Attributes:          attributes,
+		Attributes:          GetSSHFileSchema(),
 	}
 }
 
@@ -102,7 +62,7 @@ func generateFileID(path string) string {
 }
 
 func (r *SSHFileResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data SSHFileResourceModel
+	var data SSHFileModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -121,7 +81,7 @@ func (r *SSHFileResource) Create(ctx context.Context, req resource.CreateRequest
 }
 
 func (r *SSHFileResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data SSHFileResourceModel
+	var data SSHFileModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -129,7 +89,7 @@ func (r *SSHFileResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	// Create SFTP client
-	sftpClient, err := sftp.NewClient(r.manager.client)
+	sftpClient, err := sftp.NewClient(r.manager.Client)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create SFTP client", err.Error())
 		return
@@ -161,10 +121,10 @@ func (r *SSHFileResource) Read(ctx context.Context, req resource.ReadRequest, re
 }
 
 func (r *SSHFileResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data SSHFileResourceModel
+	var data SSHFileModel
 
 	// Get the current state
-	var state SSHFileResourceModel
+	var state SSHFileModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -189,7 +149,7 @@ func (r *SSHFileResource) Update(ctx context.Context, req resource.UpdateRequest
 }
 
 func (r *SSHFileResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data SSHFileResourceModel
+	var data SSHFileModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -197,7 +157,7 @@ func (r *SSHFileResource) Delete(ctx context.Context, req resource.DeleteRequest
 	}
 
 	// Create SFTP client
-	sftpClient, err := sftp.NewClient(r.manager.client)
+	sftpClient, err := sftp.NewClient(r.manager.Client)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create SFTP client", err.Error())
 		return
@@ -210,7 +170,7 @@ func (r *SSHFileResource) Delete(ctx context.Context, req resource.DeleteRequest
 	}
 }
 
-func (r *SSHFileResource) writeFile(ctx context.Context, data *SSHFileResourceModel) error {
+func (r *SSHFileResource) writeFile(ctx context.Context, data *SSHFileModel) error {
 	client, newClient, err := r.manager.GetClient(&SSHConnectionConfig{
 		Host:                 data.Host,
 		User:                 data.User,
