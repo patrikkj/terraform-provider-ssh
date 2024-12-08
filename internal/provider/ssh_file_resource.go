@@ -1,0 +1,239 @@
+package provider
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"io/fs"
+	"path/filepath"
+	"strings"
+
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/pkg/sftp"
+	"golang.org/x/crypto/ssh"
+)
+
+var _ resource.Resource = &SSHFileResource{}
+
+func NewSSHFileResource() resource.Resource {
+	return &SSHFileResource{}
+}
+
+type SSHFileResource struct {
+	client *ssh.Client
+}
+
+type SSHFileResourceModel struct {
+	Path        types.String `tfsdk:"path"`
+	Content     types.String `tfsdk:"content"`
+	Permissions types.String `tfsdk:"permissions"`
+	Id          types.String `tfsdk:"id"`
+}
+
+func (r *SSHFileResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_file"
+}
+
+func (r *SSHFileResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		MarkdownDescription: "Manage files over SSH",
+		Attributes: map[string]schema.Attribute{
+			"path": schema.StringAttribute{
+				MarkdownDescription: "Path to the file",
+				Required:            true,
+			},
+			"content": schema.StringAttribute{
+				MarkdownDescription: "Content to write to the file",
+				Required:            true,
+			},
+			"permissions": schema.StringAttribute{
+				MarkdownDescription: "File permissions (e.g., '0644')",
+				Optional:            true,
+				Computed:            true,
+				Default:             stringdefault.StaticString("0644"),
+			},
+			"id": schema.StringAttribute{
+				MarkdownDescription: "Unique identifier for this file",
+				Computed:            true,
+			},
+		},
+	}
+}
+
+func (r *SSHFileResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+
+	client, ok := req.ProviderData.(*ssh.Client)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			fmt.Sprintf("Expected *ssh.Client, got: %T", req.ProviderData),
+		)
+		return
+	}
+
+	r.client = client
+}
+
+func (r *SSHFileResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var data SSHFileResourceModel
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	fmt.Printf("Creating file: %s\n", data.Path.ValueString())
+
+	if data.Id.IsNull() {
+		data.Id = types.StringValue(data.Path.ValueString())
+	}
+
+	if err := r.writeFile(ctx, &data); err != nil {
+		resp.Diagnostics.AddError("Failed to write file", err.Error())
+		return
+	}
+
+	fmt.Printf("Successfully created file: %s\n", data.Path.ValueString())
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+func (r *SSHFileResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var data SSHFileResourceModel
+
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Create SFTP client
+	sftpClient, err := sftp.NewClient(r.client)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create SFTP client", err.Error())
+		return
+	}
+	defer sftpClient.Close()
+
+	// Open and read the file
+	f, err := sftpClient.Open(data.Path.ValueString())
+	if err != nil {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+	defer f.Close()
+
+	content, err := io.ReadAll(f)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to read file", err.Error())
+		return
+	}
+
+	// Strip trailing newline when reading
+	contentStr := string(content)
+	if len(contentStr) > 0 && strings.HasSuffix(contentStr, "\n") {
+		contentStr = contentStr[:len(contentStr)-1]
+	}
+	data.Content = types.StringValue(contentStr)
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+func (r *SSHFileResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var data SSHFileResourceModel
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if data.Id.IsNull() {
+		data.Id = types.StringValue(data.Path.ValueString())
+	}
+
+	if err := r.writeFile(ctx, &data); err != nil {
+		resp.Diagnostics.AddError("Failed to update file", err.Error())
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+func (r *SSHFileResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var data SSHFileResourceModel
+
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	fmt.Printf("Deleting file: %s\n", data.Path.ValueString())
+
+	// Create SFTP client
+	sftpClient, err := sftp.NewClient(r.client)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create SFTP client", err.Error())
+		return
+	}
+	defer sftpClient.Close()
+
+	if err := sftpClient.Remove(data.Path.ValueString()); err != nil {
+		resp.Diagnostics.AddError("Failed to delete file", err.Error())
+		return
+	}
+
+	fmt.Printf("Successfully deleted file: %s\n", data.Path.ValueString())
+}
+
+func (r *SSHFileResource) writeFile(_ context.Context, data *SSHFileResourceModel) error {
+	// Create SFTP client
+	sftpClient, err := sftp.NewClient(r.client)
+	if err != nil {
+		return fmt.Errorf("failed to create SFTP client: %w", err)
+	}
+	defer sftpClient.Close()
+
+	// Create directory if needed
+	dirPath := filepath.Dir(data.Path.ValueString())
+	if err := sftpClient.MkdirAll(dirPath); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	// Create or truncate the file
+	f, err := sftpClient.Create(data.Path.ValueString())
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer f.Close()
+
+	// Write content
+	content := data.Content.ValueString()
+	if len(content) > 0 && !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
+	if _, err := f.Write([]byte(content)); err != nil {
+		return fmt.Errorf("failed to write file content: %w", err)
+	}
+
+	// Set permissions
+	if err := sftpClient.Chmod(data.Path.ValueString(), parseFileMode(data.Permissions.ValueString())); err != nil {
+		return fmt.Errorf("failed to set permissions: %w", err)
+	}
+
+	data.Id = types.StringValue(data.Path.ValueString())
+	return nil
+}
+
+// Helper function to parse file mode
+func parseFileMode(mode string) fs.FileMode {
+	var result uint32
+	if _, err := fmt.Sscanf(mode, "%o", &result); err != nil {
+		return 0644 // Default to 0644 if parsing fails
+	}
+	return fs.FileMode(result)
+}
