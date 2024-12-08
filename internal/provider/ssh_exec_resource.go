@@ -59,7 +59,7 @@ func generateExecID(command string, timestamp time.Time) string {
 }
 
 func (r *SSHExecResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data SSHExecModel
+	var data SSHExecResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -87,7 +87,7 @@ func (r *SSHExecResource) Create(ctx context.Context, req resource.CreateRequest
 }
 
 func (r *SSHExecResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data SSHExecModel
+	var data SSHExecResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -99,10 +99,10 @@ func (r *SSHExecResource) Read(ctx context.Context, req resource.ReadRequest, re
 }
 
 func (r *SSHExecResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data SSHExecModel
+	var data SSHExecResourceModel
 
 	// Get the current state
-	var state SSHExecModel
+	var state SSHExecResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -127,7 +127,7 @@ func (r *SSHExecResource) Update(ctx context.Context, req resource.UpdateRequest
 }
 
 func (r *SSHExecResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data SSHExecModel
+	var data SSHExecResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -137,9 +137,18 @@ func (r *SSHExecResource) Delete(ctx context.Context, req resource.DeleteRequest
 	// If there's an on_destroy command, execute it
 	if !data.OnDestroy.IsNull() {
 		// Create temporary model for the destroy command
-		destroyData := SSHExecModel{
-			Command:       data.OnDestroy,
-			FailIfNonzero: data.FailIfNonzero,
+		destroyData := SSHExecResourceModel{
+			SSHExecDataSourceModel: SSHExecDataSourceModel{
+				Command:       data.OnDestroy,
+				FailIfNonzero: data.FailIfNonzero,
+				SSHConnectionModel: SSHConnectionModel{
+					Host:                 data.Host,
+					User:                 data.User,
+					Password:             data.Password,
+					PrivateKey:           data.PrivateKey,
+					UseProviderAsBastion: data.UseProviderAsBastion,
+				},
+			},
 		}
 
 		if err := r.executeCommand(ctx, &destroyData); err != nil {
@@ -149,7 +158,7 @@ func (r *SSHExecResource) Delete(ctx context.Context, req resource.DeleteRequest
 	}
 }
 
-func (r *SSHExecResource) executeCommand(ctx context.Context, data *SSHExecModel) error {
+func (r *SSHExecResource) executeCommand(ctx context.Context, data *SSHExecResourceModel) error {
 	client, newClient, err := r.manager.GetClient(&SSHConnectionConfig{
 		Host:                 data.Host,
 		User:                 data.User,

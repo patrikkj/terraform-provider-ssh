@@ -78,7 +78,7 @@ func (d *SSHExecDataSource) Configure(_ context.Context, req datasource.Configur
 }
 
 func (d *SSHExecDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data SSHExecModel
+	var data SSHExecDataSourceModel
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {

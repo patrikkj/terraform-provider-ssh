@@ -62,7 +62,7 @@ func generateFileID(path string) string {
 }
 
 func (r *SSHFileResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data SSHFileModel
+	var data SSHFileResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -81,7 +81,7 @@ func (r *SSHFileResource) Create(ctx context.Context, req resource.CreateRequest
 }
 
 func (r *SSHFileResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data SSHFileModel
+	var data SSHFileResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -121,10 +121,10 @@ func (r *SSHFileResource) Read(ctx context.Context, req resource.ReadRequest, re
 }
 
 func (r *SSHFileResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data SSHFileModel
+	var data SSHFileResourceModel
 
 	// Get the current state
-	var state SSHFileModel
+	var state SSHFileResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -149,7 +149,7 @@ func (r *SSHFileResource) Update(ctx context.Context, req resource.UpdateRequest
 }
 
 func (r *SSHFileResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data SSHFileModel
+	var data SSHFileResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -170,7 +170,7 @@ func (r *SSHFileResource) Delete(ctx context.Context, req resource.DeleteRequest
 	}
 }
 
-func (r *SSHFileResource) writeFile(ctx context.Context, data *SSHFileModel) error {
+func (r *SSHFileResource) writeFile(ctx context.Context, data *SSHFileResourceModel) error {
 	client, newClient, err := r.manager.GetClient(&SSHConnectionConfig{
 		Host:                 data.Host,
 		User:                 data.User,
