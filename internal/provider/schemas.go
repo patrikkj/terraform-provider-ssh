@@ -14,6 +14,11 @@ var SSHConnectionSchema = struct {
 	Password             rschema.StringAttribute
 	PrivateKey           rschema.StringAttribute
 	UseProviderAsBastion rschema.BoolAttribute
+	BastionHost          rschema.StringAttribute
+	BastionPort          rschema.Int64Attribute
+	BastionUser          rschema.StringAttribute
+	BastionPassword      rschema.StringAttribute
+	BastionPrivateKey    rschema.StringAttribute
 }{
 	Host: rschema.StringAttribute{
 		MarkdownDescription: "Override the provider's host configuration",
@@ -36,6 +41,28 @@ var SSHConnectionSchema = struct {
 	UseProviderAsBastion: rschema.BoolAttribute{
 		MarkdownDescription: "Use the provider's connection as a bastion host",
 		Optional:            true,
+	},
+	BastionHost: rschema.StringAttribute{
+		MarkdownDescription: "The hostname or IP address of the bastion host",
+		Optional:            true,
+	},
+	BastionPort: rschema.Int64Attribute{
+		MarkdownDescription: "The port number of the bastion host",
+		Optional:            true,
+	},
+	BastionUser: rschema.StringAttribute{
+		MarkdownDescription: "The username for bastion host authentication",
+		Optional:            true,
+	},
+	BastionPassword: rschema.StringAttribute{
+		MarkdownDescription: "The password for bastion host authentication",
+		Optional:            true,
+		Sensitive:           true,
+	},
+	BastionPrivateKey: rschema.StringAttribute{
+		MarkdownDescription: "The private key for bastion host authentication",
+		Optional:            true,
+		Sensitive:           true,
 	},
 }
 
@@ -211,6 +238,11 @@ var SSHExecResourceSchema = rschema.Schema{
 		"password":                SSHConnectionSchema.Password,
 		"private_key":             SSHConnectionSchema.PrivateKey,
 		"use_provider_as_bastion": SSHConnectionSchema.UseProviderAsBastion,
+		"bastion_host":            SSHConnectionSchema.BastionHost,
+		"bastion_port":            SSHConnectionSchema.BastionPort,
+		"bastion_user":            SSHConnectionSchema.BastionUser,
+		"bastion_password":        SSHConnectionSchema.BastionPassword,
+		"bastion_private_key":     SSHConnectionSchema.BastionPrivateKey,
 	},
 }
 
@@ -229,6 +261,11 @@ var SSHExecDataSourceSchema = dschema.Schema{
 		"password":                SSHConnectionSchema.Password,
 		"private_key":             SSHConnectionSchema.PrivateKey,
 		"use_provider_as_bastion": SSHConnectionSchema.UseProviderAsBastion,
+		"bastion_host":            SSHConnectionSchema.BastionHost,
+		"bastion_port":            SSHConnectionSchema.BastionPort,
+		"bastion_user":            SSHConnectionSchema.BastionUser,
+		"bastion_password":        SSHConnectionSchema.BastionPassword,
+		"bastion_private_key":     SSHConnectionSchema.BastionPrivateKey,
 	},
 }
 
@@ -248,6 +285,11 @@ var SSHFileResourceSchema = rschema.Schema{
 		"password":                SSHConnectionSchema.Password,
 		"private_key":             SSHConnectionSchema.PrivateKey,
 		"use_provider_as_bastion": SSHConnectionSchema.UseProviderAsBastion,
+		"bastion_host":            SSHConnectionSchema.BastionHost,
+		"bastion_port":            SSHConnectionSchema.BastionPort,
+		"bastion_user":            SSHConnectionSchema.BastionUser,
+		"bastion_password":        SSHConnectionSchema.BastionPassword,
+		"bastion_private_key":     SSHConnectionSchema.BastionPrivateKey,
 	},
 }
 
@@ -266,5 +308,10 @@ var SSHFileDataSourceSchema = dschema.Schema{
 		"password":                SSHConnectionSchema.Password,
 		"private_key":             SSHConnectionSchema.PrivateKey,
 		"use_provider_as_bastion": SSHConnectionSchema.UseProviderAsBastion,
+		"bastion_host":            SSHConnectionSchema.BastionHost,
+		"bastion_port":            SSHConnectionSchema.BastionPort,
+		"bastion_user":            SSHConnectionSchema.BastionUser,
+		"bastion_password":        SSHConnectionSchema.BastionPassword,
+		"bastion_private_key":     SSHConnectionSchema.BastionPrivateKey,
 	},
 }

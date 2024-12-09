@@ -88,8 +88,6 @@ func (p *SSHProvider) Configure(ctx context.Context, req provider.ConfigureReque
 
 	// Create the SSH manager
 	p.manager = NewSSHManager(client)
-
-	// Store both the client and manager in the response
 	resp.DataSourceData = p.manager
 	resp.ResourceData = p.manager
 }

@@ -11,6 +11,11 @@ type SSHConnectionModel struct {
 	Password             types.String `tfsdk:"password"`
 	PrivateKey           types.String `tfsdk:"private_key"`
 	UseProviderAsBastion types.Bool   `tfsdk:"use_provider_as_bastion"`
+	BastionHost          types.String `tfsdk:"bastion_host"`
+	BastionPort          types.Int64  `tfsdk:"bastion_port"`
+	BastionUser          types.String `tfsdk:"bastion_user"`
+	BastionPassword      types.String `tfsdk:"bastion_password"`
+	BastionPrivateKey    types.String `tfsdk:"bastion_private_key"`
 }
 
 type SSHProviderModel struct {

@@ -99,7 +99,7 @@ func TestAccSSHExecDataSource_FailIfNonZero(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config:      testAccSSHExecDataSourceConfigFailIfNonZero(t),
-				ExpectError: regexp.MustCompile(`command exited with non-zero status \d+:`),
+				ExpectError: regexp.MustCompile(`command exited with non-zero status: 1`),
 			},
 		},
 	})

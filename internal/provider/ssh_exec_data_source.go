@@ -60,10 +60,20 @@ func (d *SSHExecDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	// Generate ID early, based on the command
 	data.Id = types.StringValue(generateExecID(data.Command.ValueString(), time.Now()))
 
+	// Get SSH client
+	client, newClient, err := d.manager.GetClient(&data.SSHConnectionModel)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to get SSH client", err.Error())
+		return
+	}
+
+	if newClient {
+		defer client.Close()
+	}
+
 	// Execute the command
-	output, exitCode, err := executeSSHCommand(
-		d.manager,
-		&data.SSHConnectionModel,
+	output, exitCode, err := executeCommand(
+		client,
 		data.Command.ValueString(),
 		data.FailIfNonzero.ValueBool(),
 	)

@@ -63,10 +63,20 @@ func (r *SSHExecResource) Create(ctx context.Context, req resource.CreateRequest
 	// Generate a unique, stable ID before executing the command
 	data.Id = types.StringValue(generateExecID(data.Command.ValueString(), time.Now()))
 
+	// Get SSH client
+	client, newClient, err := r.manager.GetClient(&data.SSHConnectionModel)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to get SSH client", err.Error())
+		return
+	}
+
+	if newClient {
+		defer client.Close()
+	}
+
 	// Execute the command
-	output, exitCode, err := executeSSHCommand(
-		r.manager,
-		&data.SSHConnectionModel,
+	output, exitCode, err := executeCommand(
+		client,
 		data.Command.ValueString(),
 		data.FailIfNonzero.ValueBool(),
 	)
@@ -111,10 +121,20 @@ func (r *SSHExecResource) Update(ctx context.Context, req resource.UpdateRequest
 	// Preserve the original ID from state
 	data.Id = state.Id
 
+	// Get SSH client
+	client, newClient, err := r.manager.GetClient(&data.SSHConnectionModel)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to get SSH client", err.Error())
+		return
+	}
+
+	if newClient {
+		defer client.Close()
+	}
+
 	// Execute the command
-	output, exitCode, err := executeSSHCommand(
-		r.manager,
-		&data.SSHConnectionModel,
+	output, exitCode, err := executeCommand(
+		client,
 		data.Command.ValueString(),
 		data.FailIfNonzero.ValueBool(),
 	)
@@ -138,9 +158,19 @@ func (r *SSHExecResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 	// If there's an on_destroy command, execute it
 	if !data.OnDestroy.IsNull() {
-		_, _, err := executeSSHCommand(
-			r.manager,
-			&data.SSHConnectionModel,
+		// Get SSH client
+		client, newClient, err := r.manager.GetClient(&data.SSHConnectionModel)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to get SSH client", err.Error())
+			return
+		}
+
+		if newClient {
+			defer client.Close()
+		}
+
+		_, _, err = executeCommand(
+			client,
 			data.OnDestroy.ValueString(),
 			data.FailIfNonzero.ValueBool(),
 		)
