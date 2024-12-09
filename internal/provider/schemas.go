@@ -97,13 +97,13 @@ var SSHProviderAttrs = struct {
 	},
 }
 var SSHExecAttrs = struct {
-	Command                rschema.StringAttribute
-	Output                 rschema.StringAttribute
-	ExitCode               rschema.Int64Attribute
-	FailIfNonzero          rschema.BoolAttribute
-	FailIfNonzeroNoDefault rschema.BoolAttribute
-	OnDestroy              rschema.StringAttribute
-	ID                     rschema.StringAttribute
+	Command                   rschema.StringAttribute
+	Output                    rschema.StringAttribute
+	ExitCode                  rschema.Int64Attribute
+	FailIfNonzero__Resource   rschema.BoolAttribute
+	FailIfNonzero__DataSource rschema.BoolAttribute
+	OnDestroy                 rschema.StringAttribute
+	ID                        rschema.StringAttribute
 }{
 	Command: rschema.StringAttribute{
 		MarkdownDescription: "Command to execute",
@@ -117,13 +117,13 @@ var SSHExecAttrs = struct {
 		MarkdownDescription: "Exit code of the command",
 		Computed:            true,
 	},
-	FailIfNonzero: rschema.BoolAttribute{
+	FailIfNonzero__Resource: rschema.BoolAttribute{
 		MarkdownDescription: "Whether to fail if the command returns a non-zero exit code. Defaults to true if not specified.",
 		Optional:            true,
 		Computed:            true,
 		Default:             booldefault.StaticBool(true),
 	},
-	FailIfNonzeroNoDefault: rschema.BoolAttribute{
+	FailIfNonzero__DataSource: rschema.BoolAttribute{
 		MarkdownDescription: "Whether to fail if the command returns a non-zero exit code",
 		Optional:            true,
 	},
@@ -138,20 +138,25 @@ var SSHExecAttrs = struct {
 }
 
 var SSHFileAttrs = struct {
-	Path            rschema.StringAttribute
-	Content         rschema.StringAttribute
-	Permissions     rschema.StringAttribute
-	FailIfAbsent    rschema.BoolAttribute
-	DeleteOnDestroy rschema.BoolAttribute
-	ID              rschema.StringAttribute
+	Path                rschema.StringAttribute
+	Content__Resource   rschema.StringAttribute
+	Content__DataSource rschema.StringAttribute
+	Permissions         rschema.StringAttribute
+	FailIfAbsent        rschema.BoolAttribute
+	DeleteOnDestroy     rschema.BoolAttribute
+	ID                  rschema.StringAttribute
 }{
 	Path: rschema.StringAttribute{
 		MarkdownDescription: "Path to the file",
 		Required:            true,
 	},
-	Content: rschema.StringAttribute{
+	Content__Resource: rschema.StringAttribute{
 		MarkdownDescription: "Content of the file",
 		Required:            true,
+	},
+	Content__DataSource: rschema.StringAttribute{
+		MarkdownDescription: "Content of the file",
+		Computed:            true,
 	},
 	Permissions: rschema.StringAttribute{
 		MarkdownDescription: "File permissions (e.g., '0644')",
@@ -196,7 +201,7 @@ var SSHExecResourceSchema = rschema.Schema{
 		"command":         SSHExecAttrs.Command,
 		"output":          SSHExecAttrs.Output,
 		"exit_code":       SSHExecAttrs.ExitCode,
-		"fail_if_nonzero": SSHExecAttrs.FailIfNonzero,
+		"fail_if_nonzero": SSHExecAttrs.FailIfNonzero__Resource,
 		"on_destroy":      SSHExecAttrs.OnDestroy,
 		"id":              SSHExecAttrs.ID,
 
@@ -215,7 +220,7 @@ var SSHExecDataSourceSchema = dschema.Schema{
 		"command":         SSHExecAttrs.Command,
 		"output":          SSHExecAttrs.Output,
 		"exit_code":       SSHExecAttrs.ExitCode,
-		"fail_if_nonzero": SSHExecAttrs.FailIfNonzeroNoDefault,
+		"fail_if_nonzero": SSHExecAttrs.FailIfNonzero__DataSource,
 		"id":              SSHExecAttrs.ID,
 
 		// Common SSH connection attributes
@@ -231,7 +236,7 @@ var SSHFileResourceSchema = rschema.Schema{
 	MarkdownDescription: "Manage files over SSH with potential side effects",
 	Attributes: map[string]rschema.Attribute{
 		"path":              SSHFileAttrs.Path,
-		"content":           SSHFileAttrs.Content,
+		"content":           SSHFileAttrs.Content__Resource,
 		"permissions":       SSHFileAttrs.Permissions,
 		"fail_if_absent":    SSHFileAttrs.FailIfAbsent,
 		"delete_on_destroy": SSHFileAttrs.DeleteOnDestroy,
@@ -250,7 +255,7 @@ var SSHFileDataSourceSchema = dschema.Schema{
 	MarkdownDescription: "Read files over SSH",
 	Attributes: map[string]dschema.Attribute{
 		"path":           SSHFileAttrs.Path,
-		"content":        SSHFileAttrs.Content,
+		"content":        SSHFileAttrs.Content__DataSource,
 		"permissions":    SSHFileAttrs.Permissions,
 		"fail_if_absent": SSHFileAttrs.FailIfAbsent,
 		"id":             SSHFileAttrs.ID,
