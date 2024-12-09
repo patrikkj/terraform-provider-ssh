@@ -1,109 +1,263 @@
 package provider
 
 import (
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	dschema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	pschema "github.com/hashicorp/terraform-plugin-framework/provider/schema"
+	rschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 )
 
-// GetCommonSSHConnectionSchema returns schema attributes common to all resources/data sources
-func GetCommonSSHConnectionSchema() map[string]schema.Attribute {
-	return map[string]schema.Attribute{
-		"host": schema.StringAttribute{
-			MarkdownDescription: "Override the provider's host configuration",
-			Optional:            true,
-		},
-		"user": schema.StringAttribute{
-			MarkdownDescription: "Override the provider's user configuration",
-			Optional:            true,
-		},
-		"password": schema.StringAttribute{
-			MarkdownDescription: "Override the provider's password configuration",
-			Optional:            true,
-			Sensitive:           true,
-		},
-		"private_key": schema.StringAttribute{
-			MarkdownDescription: "Override the provider's private key configuration",
-			Optional:            true,
-			Sensitive:           true,
-		},
-		"use_provider_as_bastion": schema.BoolAttribute{
-			MarkdownDescription: "Use the provider's connection as a bastion host",
-			Optional:            true,
-		},
-	}
+var SSHConnectionSchema = struct {
+	Host                 rschema.StringAttribute
+	User                 rschema.StringAttribute
+	Password             rschema.StringAttribute
+	PrivateKey           rschema.StringAttribute
+	UseProviderAsBastion rschema.BoolAttribute
+}{
+	Host: rschema.StringAttribute{
+		MarkdownDescription: "Override the provider's host configuration",
+		Optional:            true,
+	},
+	User: rschema.StringAttribute{
+		MarkdownDescription: "Override the provider's user configuration",
+		Optional:            true,
+	},
+	Password: rschema.StringAttribute{
+		MarkdownDescription: "Override the provider's password configuration",
+		Optional:            true,
+		Sensitive:           true,
+	},
+	PrivateKey: rschema.StringAttribute{
+		MarkdownDescription: "Override the provider's private key configuration",
+		Optional:            true,
+		Sensitive:           true,
+	},
+	UseProviderAsBastion: rschema.BoolAttribute{
+		MarkdownDescription: "Use the provider's connection as a bastion host",
+		Optional:            true,
+	},
 }
 
-// GetSSHExecSchema returns the schema for SSH exec resources/data sources
-func GetSSHExecSchema() map[string]schema.Attribute {
-	attributes := map[string]schema.Attribute{
-		"command": schema.StringAttribute{
-			MarkdownDescription: "Command to execute",
-			Required:            true,
-		},
-		"output": schema.StringAttribute{
-			MarkdownDescription: "Output of the command",
-			Computed:            true,
-		},
-		"exit_code": schema.Int64Attribute{
-			MarkdownDescription: "Exit code of the command",
-			Computed:            true,
-		},
-		"fail_if_nonzero": schema.BoolAttribute{
-			MarkdownDescription: "Whether to fail if the command returns a non-zero exit code. Defaults to true if not specified.",
-			Optional:            true,
-			Computed:            true,
-			Default:             booldefault.StaticBool(true),
-		},
-		"on_destroy": schema.StringAttribute{
-			MarkdownDescription: "Command to execute when the resource is destroyed",
-			Optional:            true,
-		},
-		"id": schema.StringAttribute{
-			MarkdownDescription: "Unique identifier for this execution",
-			Computed:            true,
-		},
-	}
-
-	// Merge with common SSH connection attributes
-	for k, v := range GetCommonSSHConnectionSchema() {
-		attributes[k] = v
-	}
-
-	return attributes
+var SSHProviderAttrs = struct {
+	Host              pschema.StringAttribute
+	Port              pschema.Int64Attribute
+	User              pschema.StringAttribute
+	Password          pschema.StringAttribute
+	PrivateKey        pschema.StringAttribute
+	BastionHost       pschema.StringAttribute
+	BastionPort       pschema.Int64Attribute
+	BastionUser       pschema.StringAttribute
+	BastionPassword   pschema.StringAttribute
+	BastionPrivateKey pschema.StringAttribute
+}{
+	Host: pschema.StringAttribute{
+		MarkdownDescription: "The hostname or IP address of the target SSH server",
+		Required:            true,
+	},
+	Port: pschema.Int64Attribute{
+		MarkdownDescription: "The port number of the target SSH server",
+		Optional:            true,
+	},
+	User: pschema.StringAttribute{
+		MarkdownDescription: "The username for SSH authentication",
+		Required:            true,
+	},
+	Password: pschema.StringAttribute{
+		MarkdownDescription: "The password for SSH authentication",
+		Optional:            true,
+		Sensitive:           true,
+	},
+	PrivateKey: pschema.StringAttribute{
+		MarkdownDescription: "The private key for SSH authentication",
+		Optional:            true,
+		Sensitive:           true,
+	},
+	BastionHost: pschema.StringAttribute{
+		MarkdownDescription: "The hostname or IP address of the bastion host",
+		Optional:            true,
+	},
+	BastionPort: pschema.Int64Attribute{
+		MarkdownDescription: "The port number of the bastion host",
+		Optional:            true,
+	},
+	BastionUser: pschema.StringAttribute{
+		MarkdownDescription: "The username for bastion host authentication",
+		Optional:            true,
+	},
+	BastionPassword: pschema.StringAttribute{
+		MarkdownDescription: "The password for bastion host authentication",
+		Optional:            true,
+		Sensitive:           true,
+	},
+	BastionPrivateKey: pschema.StringAttribute{
+		MarkdownDescription: "The private key for bastion host authentication",
+		Optional:            true,
+		Sensitive:           true,
+	},
+}
+var SSHExecAttrs = struct {
+	Command                rschema.StringAttribute
+	Output                 rschema.StringAttribute
+	ExitCode               rschema.Int64Attribute
+	FailIfNonzero          rschema.BoolAttribute
+	FailIfNonzeroNoDefault rschema.BoolAttribute
+	OnDestroy              rschema.StringAttribute
+	ID                     rschema.StringAttribute
+}{
+	Command: rschema.StringAttribute{
+		MarkdownDescription: "Command to execute",
+		Required:            true,
+	},
+	Output: rschema.StringAttribute{
+		MarkdownDescription: "Output of the command",
+		Computed:            true,
+	},
+	ExitCode: rschema.Int64Attribute{
+		MarkdownDescription: "Exit code of the command",
+		Computed:            true,
+	},
+	FailIfNonzero: rschema.BoolAttribute{
+		MarkdownDescription: "Whether to fail if the command returns a non-zero exit code. Defaults to true if not specified.",
+		Optional:            true,
+		Computed:            true,
+		Default:             booldefault.StaticBool(true),
+	},
+	FailIfNonzeroNoDefault: rschema.BoolAttribute{
+		MarkdownDescription: "Whether to fail if the command returns a non-zero exit code",
+		Optional:            true,
+	},
+	OnDestroy: rschema.StringAttribute{
+		MarkdownDescription: "Command to execute when the resource is destroyed",
+		Optional:            true,
+	},
+	ID: rschema.StringAttribute{
+		MarkdownDescription: "Unique identifier for this execution",
+		Computed:            true,
+	},
 }
 
-// GetSSHFileSchema returns the schema for SSH file resources/data sources
-func GetSSHFileSchema() map[string]schema.Attribute {
-	attributes := map[string]schema.Attribute{
-		"path": schema.StringAttribute{
-			MarkdownDescription: "Path to the file",
-			Required:            true,
-		},
-		"content": schema.StringAttribute{
-			MarkdownDescription: "Content of the file",
-			Required:            true,
-		},
-		"permissions": schema.StringAttribute{
-			MarkdownDescription: "File permissions (e.g., '0644')",
-			Optional:            true,
-			Computed:            true,
-			Default:             stringdefault.StaticString("0644"),
-		},
-		"fail_if_absent": schema.BoolAttribute{
-			MarkdownDescription: "Whether to fail if the file does not exist",
-			Optional:            true,
-		},
-		"id": schema.StringAttribute{
-			MarkdownDescription: "Unique identifier for this file",
-			Computed:            true,
-		},
-	}
+var SSHFileAttrs = struct {
+	Path            rschema.StringAttribute
+	Content         rschema.StringAttribute
+	Permissions     rschema.StringAttribute
+	FailIfAbsent    rschema.BoolAttribute
+	DeleteOnDestroy rschema.BoolAttribute
+	ID              rschema.StringAttribute
+}{
+	Path: rschema.StringAttribute{
+		MarkdownDescription: "Path to the file",
+		Required:            true,
+	},
+	Content: rschema.StringAttribute{
+		MarkdownDescription: "Content of the file",
+		Required:            true,
+	},
+	Permissions: rschema.StringAttribute{
+		MarkdownDescription: "File permissions (e.g., '0644')",
+		Optional:            true,
+		Computed:            true,
+		Default:             stringdefault.StaticString("0644"),
+	},
+	FailIfAbsent: rschema.BoolAttribute{
+		MarkdownDescription: "Whether to fail if the file does not exist",
+		Optional:            true,
+	},
+	DeleteOnDestroy: rschema.BoolAttribute{
+		MarkdownDescription: "Command to execute when the resource is destroyed",
+		Optional:            true,
+	},
+	ID: rschema.StringAttribute{
+		MarkdownDescription: "Unique identifier for this file",
+		Computed:            true,
+	},
+}
 
-	// Merge with common SSH connection attributes
-	for k, v := range GetCommonSSHConnectionSchema() {
-		attributes[k] = v
-	}
+var SSHProviderSchema = pschema.Schema{
+	Attributes: map[string]pschema.Attribute{
+		"host":                SSHProviderAttrs.Host,
+		"port":                SSHProviderAttrs.Port,
+		"user":                SSHProviderAttrs.User,
+		"password":            SSHProviderAttrs.Password,
+		"private_key":         SSHProviderAttrs.PrivateKey,
+		"bastion_host":        SSHProviderAttrs.BastionHost,
+		"bastion_port":        SSHProviderAttrs.BastionPort,
+		"bastion_user":        SSHProviderAttrs.BastionUser,
+		"bastion_password":    SSHProviderAttrs.BastionPassword,
+		"bastion_private_key": SSHProviderAttrs.BastionPrivateKey,
+	},
+}
 
-	return attributes
+var SSHExecResourceSchema = rschema.Schema{
+	MarkdownDescription: "Execute commands over SSH with potential side effects",
+	Attributes: map[string]rschema.Attribute{
+		"command":         SSHExecAttrs.Command,
+		"output":          SSHExecAttrs.Output,
+		"exit_code":       SSHExecAttrs.ExitCode,
+		"fail_if_nonzero": SSHExecAttrs.FailIfNonzero,
+		"on_destroy":      SSHExecAttrs.OnDestroy,
+		"id":              SSHExecAttrs.ID,
+
+		// Common SSH connection attributes
+		"host":                    SSHConnectionSchema.Host,
+		"user":                    SSHConnectionSchema.User,
+		"password":                SSHConnectionSchema.Password,
+		"private_key":             SSHConnectionSchema.PrivateKey,
+		"use_provider_as_bastion": SSHConnectionSchema.UseProviderAsBastion,
+	},
+}
+
+var SSHExecDataSourceSchema = dschema.Schema{
+	MarkdownDescription: "Execute commands over SSH",
+	Attributes: map[string]dschema.Attribute{
+		"command":         SSHExecAttrs.Command,
+		"output":          SSHExecAttrs.Output,
+		"exit_code":       SSHExecAttrs.ExitCode,
+		"fail_if_nonzero": SSHExecAttrs.FailIfNonzeroNoDefault,
+		"id":              SSHExecAttrs.ID,
+
+		// Common SSH connection attributes
+		"host":                    SSHConnectionSchema.Host,
+		"user":                    SSHConnectionSchema.User,
+		"password":                SSHConnectionSchema.Password,
+		"private_key":             SSHConnectionSchema.PrivateKey,
+		"use_provider_as_bastion": SSHConnectionSchema.UseProviderAsBastion,
+	},
+}
+
+var SSHFileResourceSchema = rschema.Schema{
+	MarkdownDescription: "Manage files over SSH with potential side effects",
+	Attributes: map[string]rschema.Attribute{
+		"path":              SSHFileAttrs.Path,
+		"content":           SSHFileAttrs.Content,
+		"permissions":       SSHFileAttrs.Permissions,
+		"fail_if_absent":    SSHFileAttrs.FailIfAbsent,
+		"delete_on_destroy": SSHFileAttrs.DeleteOnDestroy,
+		"id":                SSHFileAttrs.ID,
+
+		// Common SSH connection attributes
+		"host":                    SSHConnectionSchema.Host,
+		"user":                    SSHConnectionSchema.User,
+		"password":                SSHConnectionSchema.Password,
+		"private_key":             SSHConnectionSchema.PrivateKey,
+		"use_provider_as_bastion": SSHConnectionSchema.UseProviderAsBastion,
+	},
+}
+
+var SSHFileDataSourceSchema = dschema.Schema{
+	MarkdownDescription: "Read files over SSH",
+	Attributes: map[string]dschema.Attribute{
+		"path":           SSHFileAttrs.Path,
+		"content":        SSHFileAttrs.Content,
+		"permissions":    SSHFileAttrs.Permissions,
+		"fail_if_absent": SSHFileAttrs.FailIfAbsent,
+		"id":             SSHFileAttrs.ID,
+
+		// Common SSH connection attributes
+		"host":                    SSHConnectionSchema.Host,
+		"user":                    SSHConnectionSchema.User,
+		"password":                SSHConnectionSchema.Password,
+		"private_key":             SSHConnectionSchema.PrivateKey,
+		"use_provider_as_bastion": SSHConnectionSchema.UseProviderAsBastion,
+	},
 }

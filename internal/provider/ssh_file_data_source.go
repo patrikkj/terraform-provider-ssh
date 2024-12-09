@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
-	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/pkg/sftp"
 )
@@ -26,35 +25,7 @@ func (d *SSHFileDataSource) Metadata(_ context.Context, req datasource.MetadataR
 }
 
 func (d *SSHFileDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
-	// Create specific attributes
-	attributes := map[string]schema.Attribute{
-		"path": schema.StringAttribute{
-			MarkdownDescription: "Path to the file to read",
-			Required:            true,
-		},
-		"content": schema.StringAttribute{
-			MarkdownDescription: "Content of the file",
-			Computed:            true,
-		},
-		"fail_if_absent": schema.BoolAttribute{
-			MarkdownDescription: "Fail if the file does not exist",
-			Optional:            true,
-		},
-		"id": schema.StringAttribute{
-			MarkdownDescription: "Unique identifier for this file read",
-			Computed:            true,
-		},
-	}
-
-	// Merge with common SSH connection attributes
-	for k, v := range GetCommonSSHConnectionSchema() {
-		attributes[k] = v
-	}
-
-	resp.Schema = schema.Schema{
-		MarkdownDescription: "Read files over SSH",
-		Attributes:          attributes,
-	}
+	resp.Schema = SSHFileDataSourceSchema
 }
 
 func (d *SSHFileDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -82,7 +53,7 @@ func (d *SSHFileDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	client, newClient, err := d.manager.GetClient(&SSHConnectionConfig{
+	client, newClient, err := d.manager.GetClient(&SSHConnectionModel{
 		Host:                 data.Host,
 		User:                 data.User,
 		Password:             data.Password,

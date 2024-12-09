@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/function"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
-	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"golang.org/x/crypto/ssh"
@@ -32,54 +31,7 @@ func (p *SSHProvider) Metadata(_ context.Context, _ provider.MetadataRequest, re
 }
 
 func (p *SSHProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Attributes: map[string]schema.Attribute{
-			"host": schema.StringAttribute{
-				MarkdownDescription: "The hostname or IP address of the target SSH server",
-				Required:            true,
-			},
-			"port": schema.Int64Attribute{
-				MarkdownDescription: "The port number of the target SSH server",
-				Optional:            true,
-			},
-			"user": schema.StringAttribute{
-				MarkdownDescription: "The username for SSH authentication",
-				Required:            true,
-			},
-			"password": schema.StringAttribute{
-				MarkdownDescription: "The password for SSH authentication",
-				Optional:            true,
-				Sensitive:           true,
-			},
-			"private_key": schema.StringAttribute{
-				MarkdownDescription: "The private key for SSH authentication",
-				Optional:            true,
-				Sensitive:           true,
-			},
-			"bastion_host": schema.StringAttribute{
-				MarkdownDescription: "The hostname or IP address of the bastion host",
-				Optional:            true,
-			},
-			"bastion_port": schema.Int64Attribute{
-				MarkdownDescription: "The port number of the bastion host",
-				Optional:            true,
-			},
-			"bastion_user": schema.StringAttribute{
-				MarkdownDescription: "The username for bastion host authentication",
-				Optional:            true,
-			},
-			"bastion_password": schema.StringAttribute{
-				MarkdownDescription: "The password for bastion host authentication",
-				Optional:            true,
-				Sensitive:           true,
-			},
-			"bastion_private_key": schema.StringAttribute{
-				MarkdownDescription: "The private key for bastion host authentication",
-				Optional:            true,
-				Sensitive:           true,
-			},
-		},
-	}
+	resp.Schema = SSHProviderSchema
 }
 
 func (p *SSHProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {

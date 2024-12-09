@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/pkg/sftp"
@@ -32,10 +31,7 @@ func (r *SSHFileResource) Metadata(_ context.Context, req resource.MetadataReque
 }
 
 func (r *SSHFileResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manage files over SSH",
-		Attributes:          GetSSHFileSchema(),
-	}
+	resp.Schema = SSHFileResourceSchema
 }
 
 func (r *SSHFileResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -171,7 +167,7 @@ func (r *SSHFileResource) Delete(ctx context.Context, req resource.DeleteRequest
 }
 
 func (r *SSHFileResource) writeFile(ctx context.Context, data *SSHFileResourceModel) error {
-	client, newClient, err := r.manager.GetClient(&SSHConnectionConfig{
+	client, newClient, err := r.manager.GetClient(&SSHConnectionModel{
 		Host:                 data.Host,
 		User:                 data.User,
 		Password:             data.Password,

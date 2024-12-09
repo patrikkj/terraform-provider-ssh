@@ -2,15 +2,11 @@ package provider
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"golang.org/x/crypto/ssh"
 )
 
 var _ resource.Resource = &SSHExecResource{}
@@ -28,10 +24,7 @@ func (r *SSHExecResource) Metadata(_ context.Context, req resource.MetadataReque
 }
 
 func (r *SSHExecResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		MarkdownDescription: "Execute commands over SSH with potential side effects",
-		Attributes:          GetSSHExecSchema(),
-	}
+	resp.Schema = SSHExecResourceSchema
 }
 
 func (r *SSHExecResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -51,13 +44,6 @@ func (r *SSHExecResource) Configure(_ context.Context, req resource.ConfigureReq
 	r.manager = manager
 }
 
-func generateExecID(command string, timestamp time.Time) string {
-	h := md5.New()
-	h.Write([]byte(command))
-	h.Write([]byte(timestamp.UTC().Format(time.RFC3339)))
-	return hex.EncodeToString(h.Sum(nil))
-}
-
 func (r *SSHExecResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data SSHExecResourceModel
 
@@ -74,14 +60,22 @@ func (r *SSHExecResource) Create(ctx context.Context, req resource.CreateRequest
 		data.ExitCode = types.Int64Value(0)
 	}
 
-	// Generate a unique, stable ID using command and creation timestamp
-	timestamp := time.Now()
-	data.Id = types.StringValue(generateExecID(data.Command.ValueString(), timestamp))
+	// Generate a unique, stable ID before executing the command
+	data.Id = types.StringValue(generateExecID(data.Command.ValueString(), time.Now()))
 
-	if err := r.executeCommand(ctx, &data); err != nil {
+	// Execute the command
+	output, exitCode, err := executeSSHCommand(
+		r.manager,
+		&data.SSHConnectionModel,
+		data.Command.ValueString(),
+		data.FailIfNonzero.ValueBool(),
+	)
+	if err != nil {
 		resp.Diagnostics.AddError("Command execution failed", err.Error())
 		return
 	}
+	data.Output = types.StringValue(output)
+	data.ExitCode = types.Int64Value(exitCode)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -118,10 +112,18 @@ func (r *SSHExecResource) Update(ctx context.Context, req resource.UpdateRequest
 	data.Id = state.Id
 
 	// Execute the command
-	if err := r.executeCommand(ctx, &data); err != nil {
+	output, exitCode, err := executeSSHCommand(
+		r.manager,
+		&data.SSHConnectionModel,
+		data.Command.ValueString(),
+		data.FailIfNonzero.ValueBool(),
+	)
+	if err != nil {
 		resp.Diagnostics.AddError("Command execution failed", err.Error())
 		return
 	}
+	data.Output = types.StringValue(output)
+	data.ExitCode = types.Int64Value(exitCode)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -136,68 +138,15 @@ func (r *SSHExecResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 	// If there's an on_destroy command, execute it
 	if !data.OnDestroy.IsNull() {
-		// Create temporary model for the destroy command
-		destroyData := SSHExecResourceModel{
-			SSHExecDataSourceModel: SSHExecDataSourceModel{
-				Command:       data.OnDestroy,
-				FailIfNonzero: data.FailIfNonzero,
-				SSHConnectionModel: SSHConnectionModel{
-					Host:                 data.Host,
-					User:                 data.User,
-					Password:             data.Password,
-					PrivateKey:           data.PrivateKey,
-					UseProviderAsBastion: data.UseProviderAsBastion,
-				},
-			},
-		}
-
-		if err := r.executeCommand(ctx, &destroyData); err != nil {
+		_, _, err := executeSSHCommand(
+			r.manager,
+			&data.SSHConnectionModel,
+			data.OnDestroy.ValueString(),
+			data.FailIfNonzero.ValueBool(),
+		)
+		if err != nil {
 			resp.Diagnostics.AddError("Failed to execute destroy command", err.Error())
 			return
 		}
 	}
-}
-
-func (r *SSHExecResource) executeCommand(ctx context.Context, data *SSHExecResourceModel) error {
-	client, newClient, err := r.manager.GetClient(&SSHConnectionConfig{
-		Host:                 data.Host,
-		User:                 data.User,
-		Password:             data.Password,
-		PrivateKey:           data.PrivateKey,
-		UseProviderAsBastion: data.UseProviderAsBastion,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to get SSH client: %w", err)
-	}
-
-	// If we created a new client, close it when done
-	if newClient {
-		defer client.Close()
-	}
-
-	session, err := client.NewSession()
-	if err != nil {
-		return fmt.Errorf("failed to create SSH session: %w", err)
-	}
-	defer session.Close()
-
-	// Execute command and capture output
-	output, err := session.CombinedOutput(data.Command.ValueString())
-	if err != nil {
-		if exitErr, ok := err.(*ssh.ExitError); ok {
-			exitCode := int64(exitErr.ExitStatus())
-			data.ExitCode = types.Int64Value(exitCode)
-			if data.FailIfNonzero.ValueBool() && exitCode != 0 {
-				return fmt.Errorf("command exited with non-zero status: %d", exitCode)
-			}
-		} else {
-			return err
-		}
-	} else {
-		data.ExitCode = types.Int64Value(0)
-	}
-
-	data.Output = types.StringValue(string(output))
-
-	return nil
 }

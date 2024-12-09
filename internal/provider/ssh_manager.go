@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -20,16 +19,8 @@ func NewSSHManager(providerClient *ssh.Client) *SSHManager {
 	}
 }
 
-type SSHConnectionConfig struct {
-	Host                 types.String
-	User                 types.String
-	Password             types.String
-	PrivateKey           types.String
-	UseProviderAsBastion types.Bool
-}
-
 // GetClient returns an SSH client based on the provided configuration
-func (m *SSHManager) GetClient(config *SSHConnectionConfig) (*ssh.Client, bool, error) {
+func (m *SSHManager) GetClient(config *SSHConnectionModel) (*ssh.Client, bool, error) {
 	// If no override credentials are provided, return the provider's client
 	if config.Host.IsNull() && config.User.IsNull() && config.Password.IsNull() && config.PrivateKey.IsNull() &&
 		(config.UseProviderAsBastion.IsNull() || !config.UseProviderAsBastion.ValueBool()) {

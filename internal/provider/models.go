@@ -26,7 +26,6 @@ type SSHProviderModel struct {
 	BastionPrivateKey types.String `tfsdk:"bastion_private_key"`
 }
 
-// ssh_exec models
 type SSHExecDataSourceModel struct {
 	Command       types.String `tfsdk:"command"`
 	Output        types.String `tfsdk:"output"`
@@ -37,11 +36,15 @@ type SSHExecDataSourceModel struct {
 }
 
 type SSHExecResourceModel struct {
-	SSHExecDataSourceModel
-	OnDestroy types.String `tfsdk:"on_destroy"`
+	Command       types.String `tfsdk:"command"`
+	Output        types.String `tfsdk:"output"`
+	ExitCode      types.Int64  `tfsdk:"exit_code"`
+	FailIfNonzero types.Bool   `tfsdk:"fail_if_nonzero"`
+	OnDestroy     types.String `tfsdk:"on_destroy"`
+	Id            types.String `tfsdk:"id"`
+	SSHConnectionModel
 }
 
-// ssh_file models
 type SSHFileDataSourceModel struct {
 	Path         types.String `tfsdk:"path"`
 	Content      types.String `tfsdk:"content"`
@@ -52,5 +55,11 @@ type SSHFileDataSourceModel struct {
 }
 
 type SSHFileResourceModel struct {
-	SSHFileDataSourceModel
+	Path            types.String `tfsdk:"path"`
+	Content         types.String `tfsdk:"content"`
+	Permissions     types.String `tfsdk:"permissions"`
+	FailIfAbsent    types.Bool   `tfsdk:"fail_if_absent"`
+	DeleteOnDestroy types.String `tfsdk:"delete_on_destroy"`
+	Id              types.String `tfsdk:"id"`
+	SSHConnectionModel
 }
