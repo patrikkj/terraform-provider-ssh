@@ -164,8 +164,10 @@ var SSHFileAttrs = struct {
 		Optional:            true,
 	},
 	DeleteOnDestroy: rschema.BoolAttribute{
-		MarkdownDescription: "Command to execute when the resource is destroyed",
+		MarkdownDescription: "Whether to delete the file when the resource is destroyed. Defaults to true.",
 		Optional:            true,
+		Computed:            true,
+		Default:             booldefault.StaticBool(true),
 	},
 	ID: rschema.StringAttribute{
 		MarkdownDescription: "Unique identifier for this file",

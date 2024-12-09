@@ -3,11 +3,9 @@ package provider
 import (
 	"context"
 	"fmt"
-	"io"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/pkg/sftp"
 )
 
 var _ datasource.DataSource = &SSHFileDataSource{}
@@ -53,33 +51,17 @@ func (d *SSHFileDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	client, newClient, err := d.manager.GetClient(&SSHConnectionModel{
-		Host:                 data.Host,
-		User:                 data.User,
-		Password:             data.Password,
-		PrivateKey:           data.PrivateKey,
-		UseProviderAsBastion: data.UseProviderAsBastion,
-	})
+	client, newClient, err := d.manager.GetClient(&data.SSHConnectionModel)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get SSH client", err.Error())
 		return
 	}
 
-	// If we created a new client, close it when done
 	if newClient {
 		defer client.Close()
 	}
 
-	// Create SFTP client
-	sftpClient, err := sftp.NewClient(client)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to create SFTP client", err.Error())
-		return
-	}
-	defer sftpClient.Close()
-
-	// Open and read the file
-	f, err := sftpClient.Open(data.Path.ValueString())
+	content, err := readFile(client, data.Path.ValueString())
 	if err != nil {
 		if data.FailIfAbsent.ValueBool() {
 			resp.Diagnostics.AddError("Failed to read file", err.Error())
@@ -88,13 +70,7 @@ func (d *SSHFileDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		// If fail_if_absent is false, return empty content
 		data.Content = types.StringValue("")
 	} else {
-		defer f.Close()
-		content, err := io.ReadAll(f)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to read file contents", err.Error())
-			return
-		}
-		data.Content = types.StringValue(string(content))
+		data.Content = types.StringValue(content)
 	}
 
 	data.Id = types.StringValue(data.Path.ValueString())

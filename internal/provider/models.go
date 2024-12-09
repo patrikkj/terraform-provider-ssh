@@ -59,7 +59,7 @@ type SSHFileResourceModel struct {
 	Content         types.String `tfsdk:"content"`
 	Permissions     types.String `tfsdk:"permissions"`
 	FailIfAbsent    types.Bool   `tfsdk:"fail_if_absent"`
-	DeleteOnDestroy types.String `tfsdk:"delete_on_destroy"`
+	DeleteOnDestroy types.Bool   `tfsdk:"delete_on_destroy"`
 	Id              types.String `tfsdk:"id"`
 	SSHConnectionModel
 }
