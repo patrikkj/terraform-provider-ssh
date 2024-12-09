@@ -5,16 +5,12 @@ package provider
 
 import (
 	"context"
-	"fmt"
-	"net"
-	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/function"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"golang.org/x/crypto/ssh"
 )
 
 var _ provider.Provider = &SSHProvider{}
@@ -47,47 +43,17 @@ func (p *SSHProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		config.Port = types.Int64Value(22)
 	}
 
-	// Create SSH client configuration
-	sshConfig := &ssh.ClientConfig{
-		User:            config.User.ValueString(),
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: Add proper host key verification
-	}
-
-	// Configure authentication
-	if !config.Password.IsNull() {
-		sshConfig.Auth = append(sshConfig.Auth, ssh.Password(config.Password.ValueString()))
-	}
-	if !config.PrivateKey.IsNull() {
-		keyContent := config.PrivateKey.ValueString()
-
-		// Parse the private key
-		signer, err := ssh.ParsePrivateKey([]byte(keyContent))
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Unable to parse private key",
-				fmt.Sprintf("Private key parsing failed: %v", err),
-			)
-			return
-		}
-
-		sshConfig.Auth = append(sshConfig.Auth, ssh.PublicKeys(signer))
-	}
-
-	// Create target address
-	target := net.JoinHostPort(config.Host.ValueString(), strconv.FormatInt(config.Port.ValueInt64(), 10))
-
-	// Create SSH client
-	client, err := ssh.Dial("tcp", target, sshConfig)
+	// Create the SSH manager with provider configuration
+	manager, err := NewSSHManager(config.SSHConnectionModel.toConfig(), config.Bastion.toConfig())
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Unable to create SSH client",
+			"Unable to create SSH manager",
 			err.Error(),
 		)
 		return
 	}
 
-	// Create the SSH manager
-	p.manager = NewSSHManager(client)
+	p.manager = manager
 	resp.DataSourceData = p.manager
 	resp.ResourceData = p.manager
 }

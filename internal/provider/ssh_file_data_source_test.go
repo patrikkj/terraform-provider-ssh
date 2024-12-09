@@ -65,7 +65,7 @@ func TestAccSSHFileDataSource_FailIfAbsent(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config:      testAccSSHFileDataSourceConfigFailIfAbsent(t),
-				ExpectError: regexp.MustCompile("Failed to read file"),
+				ExpectError: regexp.MustCompile(`Failed to read file`),
 			},
 		},
 	})
@@ -80,7 +80,7 @@ provider "ssh" {
 }
 
 data "ssh_file" "missing_required" {
-	path = "/nonexistent/file"
+	path           = "/path/to/nonexistent/file"
 	fail_if_absent = true
 }
 `, getEnvVarOrSkip(t, "SSH_HOST"), getEnvVarOrSkip(t, "SSH_USER"), getEnvVarOrSkip(t, "SSH_PASSWORD"))

@@ -22,6 +22,11 @@ type SSHConnectionConfig struct {
 }
 
 func (m *SSHConnectionModel) toConfig() *SSHConnectionConfig {
+	// Handle nil receiver
+	if m == nil {
+		return nil
+	}
+
 	config := &SSHConnectionConfig{}
 
 	if !m.Host.IsNull() {

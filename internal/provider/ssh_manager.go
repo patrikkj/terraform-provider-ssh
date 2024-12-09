@@ -10,19 +10,31 @@ import (
 
 // SSHManager handles SSH connections for the provider
 type SSHManager struct {
-	providerClient *ssh.Client
+	providerConfig  *SSHConnectionConfig
+	providerBastion *SSHConnectionConfig
+	providerClient  *ssh.Client
 }
 
 // NewSSHManager creates a new SSH connection manager
-func NewSSHManager(client *ssh.Client) *SSHManager {
-	return &SSHManager{
-		providerClient: client,
+func NewSSHManager(config *SSHConnectionConfig, bastion *SSHConnectionConfig) (*SSHManager, error) {
+	manager := &SSHManager{
+		providerConfig:  config,
+		providerBastion: bastion,
 	}
+
+	// Create initial provider client
+	client, _, err := manager.GetClient(*config, false, bastion, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create provider client: %w", err)
+	}
+
+	manager.providerClient = client
+	return manager, nil
 }
 
 // GetClient returns an SSH client based on the provided configuration
 func (m *SSHManager) GetClient(config SSHConnectionConfig, useProviderAsBastion bool, bastion *SSHConnectionConfig, fromClient *ssh.Client) (*ssh.Client, bool, error) {
-	// If useProviderAsBastion is true, recurse with the provider client
+	// If useProviderAsBastion is true, use the provider client as bastion
 	if useProviderAsBastion {
 		return m.GetClient(config, false, bastion, m.providerClient)
 	}
@@ -31,9 +43,14 @@ func (m *SSHManager) GetClient(config SSHConnectionConfig, useProviderAsBastion 
 	if bastion != nil {
 		bastionClient, _, err := m.GetClient(*bastion, false, nil, fromClient)
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to connect to bastion: %v", err)
+			return nil, false, fmt.Errorf("failed to connect to bastion: %w", err)
 		}
 		return m.GetClient(config, false, nil, bastionClient)
+	}
+
+	// If there is on configuration, fall back to provider client
+	if fromClient == nil && config.Host == nil {
+		return m.providerClient, false, nil
 	}
 
 	// Create ssh client configuration
@@ -49,7 +66,7 @@ func (m *SSHManager) GetClient(config SSHConnectionConfig, useProviderAsBastion 
 	if config.PrivateKey != nil {
 		signer, err := ssh.ParsePrivateKey([]byte(*config.PrivateKey))
 		if err != nil {
-			return nil, false, fmt.Errorf("unable to parse private key: %v", err)
+			return nil, false, fmt.Errorf("unable to parse private key: %w", err)
 		}
 		sshConfig.Auth = append(sshConfig.Auth, ssh.PublicKeys(signer))
 	}
@@ -63,13 +80,9 @@ func (m *SSHManager) GetClient(config SSHConnectionConfig, useProviderAsBastion 
 
 	// If there is no fromClient, return a new client using ssh.Dial
 	if fromClient == nil {
-		// If config is not provided, use the provider client
-		if *config.Host == "" {
-			return m.providerClient, true, nil
-		}
 		client, err := ssh.Dial("tcp", target, sshConfig)
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to connect to target host: %v", err)
+			return nil, false, fmt.Errorf("failed to connect to target host: %w", err)
 		}
 		return client, true, nil
 	}
@@ -77,11 +90,11 @@ func (m *SSHManager) GetClient(config SSHConnectionConfig, useProviderAsBastion 
 	// Create new client through fromClient
 	conn, err := fromClient.Dial("tcp", target)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to connect to target host through bastion: %v", err)
+		return nil, false, fmt.Errorf("failed to connect to target host through bastion: %w", err)
 	}
 	ncc, chans, reqs, err := ssh.NewClientConn(conn, target, sshConfig)
 	if err != nil {
-		return nil, false, fmt.Errorf("unable to create SSH connection through bastion: %v", err)
+		return nil, false, fmt.Errorf("unable to create SSH connection through bastion: %w", err)
 	}
 	return ssh.NewClient(ncc, chans, reqs), true, nil
 }
