@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/pkg/sftp"
@@ -24,10 +25,11 @@ func parseFileMode(mode string) fs.FileMode {
 	return fs.FileMode(result)
 }
 
-// generateFileID creates a unique identifier for a file based on its path
-func generateFileID(path string) string {
+// generateFileID creates a unique identifier for a file based on its path and timestamp
+func generateFileID(path string, timestamp time.Time) string {
 	h := md5.New()
 	h.Write([]byte(path))
+	h.Write([]byte(timestamp.UTC().Format(time.RFC3339)))
 	return hex.EncodeToString(h.Sum(nil))
 }
 

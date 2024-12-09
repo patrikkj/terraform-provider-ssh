@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -51,6 +52,9 @@ func (d *SSHFileDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
+	// Generate a unique ID early, based on the path
+	data.Id = types.StringValue(generateFileID(data.Path.ValueString(), time.Now()))
+
 	client, newClient, err := d.manager.GetClient(&data.SSHConnectionModel)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get SSH client", err.Error())
@@ -73,6 +77,5 @@ func (d *SSHFileDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		data.Content = types.StringValue(content)
 	}
 
-	data.Id = types.StringValue(data.Path.ValueString())
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

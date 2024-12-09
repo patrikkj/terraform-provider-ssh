@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -51,8 +52,8 @@ func (r *SSHFileResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	// Generate a unique, stable ID using the file path
-	data.Id = types.StringValue(generateFileID(data.Path.ValueString()))
+	// Generate a unique, stable ID before writing the file
+	data.Id = types.StringValue(generateFileID(data.Path.ValueString(), time.Now()))
 
 	client, newClient, err := r.manager.GetClient(&data.SSHConnectionModel)
 	if err != nil {
