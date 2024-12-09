@@ -64,7 +64,12 @@ func (r *SSHExecResource) Create(ctx context.Context, req resource.CreateRequest
 	data.Id = types.StringValue(generateExecID(data.Command.ValueString(), time.Now()))
 
 	// Get SSH client
-	client, newClient, err := r.manager.GetClient(&data.SSHConnectionModel)
+	client, newClient, err := r.manager.GetClient(
+		*data.SSHConnectionModel.toConfig(),
+		data.UseProviderAsBastion.ValueBool(),
+		data.Bastion.toConfig(),
+		nil,
+	)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get SSH client", err.Error())
 		return
@@ -122,7 +127,12 @@ func (r *SSHExecResource) Update(ctx context.Context, req resource.UpdateRequest
 	data.Id = state.Id
 
 	// Get SSH client
-	client, newClient, err := r.manager.GetClient(&data.SSHConnectionModel)
+	client, newClient, err := r.manager.GetClient(
+		*data.SSHConnectionModel.toConfig(),
+		data.UseProviderAsBastion.ValueBool(),
+		data.Bastion.toConfig(),
+		nil,
+	)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get SSH client", err.Error())
 		return
@@ -159,7 +169,12 @@ func (r *SSHExecResource) Delete(ctx context.Context, req resource.DeleteRequest
 	// If there's an on_destroy command, execute it
 	if !data.OnDestroy.IsNull() {
 		// Get SSH client
-		client, newClient, err := r.manager.GetClient(&data.SSHConnectionModel)
+		client, newClient, err := r.manager.GetClient(
+			*data.SSHConnectionModel.toConfig(),
+			data.UseProviderAsBastion.ValueBool(),
+			data.Bastion.toConfig(),
+			nil,
+		)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to get SSH client", err.Error())
 			return

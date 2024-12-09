@@ -13,6 +13,41 @@ type SSHConnectionModel struct {
 	Port       types.Int64  `tfsdk:"port"`
 }
 
+type SSHConnectionConfig struct {
+	Host       *string
+	User       *string
+	Password   *string
+	PrivateKey *string
+	Port       *int64
+}
+
+func (m *SSHConnectionModel) toConfig() *SSHConnectionConfig {
+	config := &SSHConnectionConfig{}
+
+	if !m.Host.IsNull() {
+		value := m.Host.ValueString()
+		config.Host = &value
+	}
+	if !m.User.IsNull() {
+		value := m.User.ValueString()
+		config.User = &value
+	}
+	if !m.Password.IsNull() {
+		value := m.Password.ValueString()
+		config.Password = &value
+	}
+	if !m.PrivateKey.IsNull() {
+		value := m.PrivateKey.ValueString()
+		config.PrivateKey = &value
+	}
+	if !m.Port.IsNull() {
+		value := m.Port.ValueInt64()
+		config.Port = &value
+	}
+
+	return config
+}
+
 type SSHProviderModel struct {
 	SSHConnectionModel
 	Bastion *SSHConnectionModel `tfsdk:"bastion"`

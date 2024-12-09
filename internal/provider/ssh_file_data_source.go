@@ -55,7 +55,12 @@ func (d *SSHFileDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	// Generate a unique ID early, based on the path
 	data.Id = types.StringValue(generateFileID(data.Path.ValueString(), time.Now()))
 
-	client, newClient, err := d.manager.GetClient(&data.SSHConnectionModel)
+	client, newClient, err := d.manager.GetClient(
+		*data.SSHConnectionModel.toConfig(),
+		data.UseProviderAsBastion.ValueBool(),
+		data.Bastion.toConfig(),
+		nil,
+	)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get SSH client", err.Error())
 		return

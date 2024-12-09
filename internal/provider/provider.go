@@ -46,9 +46,6 @@ func (p *SSHProvider) Configure(ctx context.Context, req provider.ConfigureReque
 	if config.Port.IsNull() {
 		config.Port = types.Int64Value(22)
 	}
-	if config.BastionPort.IsNull() {
-		config.BastionPort = types.Int64Value(22)
-	}
 
 	// Create SSH client configuration
 	sshConfig := &ssh.ClientConfig{
@@ -76,8 +73,11 @@ func (p *SSHProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		sshConfig.Auth = append(sshConfig.Auth, ssh.PublicKeys(signer))
 	}
 
+	// Create target address
+	target := net.JoinHostPort(config.Host.ValueString(), strconv.FormatInt(config.Port.ValueInt64(), 10))
+
 	// Create SSH client
-	client, err := createSSHClient(config, sshConfig)
+	client, err := ssh.Dial("tcp", target, sshConfig)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to create SSH client",
@@ -90,50 +90,6 @@ func (p *SSHProvider) Configure(ctx context.Context, req provider.ConfigureReque
 	p.manager = NewSSHManager(client)
 	resp.DataSourceData = p.manager
 	resp.ResourceData = p.manager
-}
-
-func createSSHClient(config SSHProviderModel, sshConfig *ssh.ClientConfig) (*ssh.Client, error) {
-	target := net.JoinHostPort(config.Host.ValueString(), strconv.FormatInt(config.Port.ValueInt64(), 10))
-
-	if config.BastionHost.IsNull() {
-		// Direct connection
-		return ssh.Dial("tcp", target, sshConfig)
-	}
-
-	// Connection through bastion host
-	bastionConfig := &ssh.ClientConfig{
-		User:            config.BastionUser.ValueString(),
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: Add proper host key verification
-	}
-
-	if !config.BastionPassword.IsNull() {
-		bastionConfig.Auth = append(bastionConfig.Auth, ssh.Password(config.BastionPassword.ValueString()))
-	}
-	if !config.BastionPrivateKey.IsNull() {
-		signer, err := ssh.ParsePrivateKey([]byte(config.BastionPrivateKey.ValueString()))
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse bastion private key: %v", err)
-		}
-		bastionConfig.Auth = append(bastionConfig.Auth, ssh.PublicKeys(signer))
-	}
-
-	bastionHost := net.JoinHostPort(config.BastionHost.ValueString(), strconv.FormatInt(config.BastionPort.ValueInt64(), 10))
-	bastionClient, err := ssh.Dial("tcp", bastionHost, bastionConfig)
-	if err != nil {
-		return nil, fmt.Errorf("unable to connect to bastion host: %v", err)
-	}
-
-	conn, err := bastionClient.Dial("tcp", target)
-	if err != nil {
-		return nil, fmt.Errorf("unable to connect to target host through bastion: %v", err)
-	}
-
-	ncc, chans, reqs, err := ssh.NewClientConn(conn, target, sshConfig)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create SSH connection through bastion: %v", err)
-	}
-
-	return ssh.NewClient(ncc, chans, reqs), nil
 }
 
 func (p *SSHProvider) Resources(ctx context.Context) []func() resource.Resource {
