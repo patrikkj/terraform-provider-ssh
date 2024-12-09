@@ -60,10 +60,14 @@ func (m *SSHManager) GetClient(config *SSHConnectionModel) (*ssh.Client, bool, e
 }
 
 func (m *SSHManager) createSSHClientWithBastion(config *SSHConnectionModel, sshConfig *ssh.ClientConfig, startingClient *ssh.Client) (*ssh.Client, error) {
-	target := net.JoinHostPort(config.Host.ValueString(), "22") // Default to port 22 if not specified
+	port := int64(22)
+	if !config.Port.IsNull() {
+		port = config.Port.ValueInt64()
+	}
+	target := net.JoinHostPort(config.Host.ValueString(), strconv.FormatInt(port, 10))
 
 	// If no bastion is configured and we're not using provider as bastion, make direct connection
-	if config.BastionHost.IsNull() && startingClient == nil {
+	if config.Bastion == nil && startingClient == nil {
 		return ssh.Dial("tcp", target, sshConfig)
 	}
 
@@ -73,26 +77,26 @@ func (m *SSHManager) createSSHClientWithBastion(config *SSHConnectionModel, sshC
 	} else {
 		// Configure bastion connection
 		bastionConfig := &ssh.ClientConfig{
-			User:            config.BastionUser.ValueString(),
+			User:            config.Bastion.User.ValueString(),
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		}
 
-		if !config.BastionPassword.IsNull() {
-			bastionConfig.Auth = append(bastionConfig.Auth, ssh.Password(config.BastionPassword.ValueString()))
+		if !config.Bastion.Password.IsNull() {
+			bastionConfig.Auth = append(bastionConfig.Auth, ssh.Password(config.Bastion.Password.ValueString()))
 		}
-		if !config.BastionPrivateKey.IsNull() {
-			signer, err := ssh.ParsePrivateKey([]byte(config.BastionPrivateKey.ValueString()))
+		if !config.Bastion.PrivateKey.IsNull() {
+			signer, err := ssh.ParsePrivateKey([]byte(config.Bastion.PrivateKey.ValueString()))
 			if err != nil {
 				return nil, fmt.Errorf("unable to parse bastion private key: %v", err)
 			}
 			bastionConfig.Auth = append(bastionConfig.Auth, ssh.PublicKeys(signer))
 		}
 
-		bastionPort := "22"
-		if !config.BastionPort.IsNull() {
-			bastionPort = strconv.FormatInt(config.BastionPort.ValueInt64(), 10)
+		bastionPort := int64(22)
+		if !config.Bastion.Port.IsNull() {
+			bastionPort = config.Bastion.Port.ValueInt64()
 		}
-		bastionHost := net.JoinHostPort(config.BastionHost.ValueString(), bastionPort)
+		bastionHost := net.JoinHostPort(config.Bastion.Host.ValueString(), strconv.FormatInt(bastionPort, 10))
 
 		var err error
 		bastionClient, err = ssh.Dial("tcp", bastionHost, bastionConfig)

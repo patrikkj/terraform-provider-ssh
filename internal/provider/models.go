@@ -6,29 +6,16 @@ import (
 
 // Common model for SSH connection configuration
 type SSHConnectionModel struct {
-	Host                 types.String `tfsdk:"host"`
-	User                 types.String `tfsdk:"user"`
-	Password             types.String `tfsdk:"password"`
-	PrivateKey           types.String `tfsdk:"private_key"`
-	UseProviderAsBastion types.Bool   `tfsdk:"use_provider_as_bastion"`
-	BastionHost          types.String `tfsdk:"bastion_host"`
-	BastionPort          types.Int64  `tfsdk:"bastion_port"`
-	BastionUser          types.String `tfsdk:"bastion_user"`
-	BastionPassword      types.String `tfsdk:"bastion_password"`
-	BastionPrivateKey    types.String `tfsdk:"bastion_private_key"`
+	Host       types.String `tfsdk:"host"`
+	User       types.String `tfsdk:"user"`
+	Password   types.String `tfsdk:"password"`
+	PrivateKey types.String `tfsdk:"private_key"`
+	Port       types.Int64  `tfsdk:"port"`
 }
 
 type SSHProviderModel struct {
-	Host              types.String `tfsdk:"host"`
-	Port              types.Int64  `tfsdk:"port"`
-	User              types.String `tfsdk:"user"`
-	Password          types.String `tfsdk:"password"`
-	PrivateKey        types.String `tfsdk:"private_key"`
-	BastionHost       types.String `tfsdk:"bastion_host"`
-	BastionPort       types.Int64  `tfsdk:"bastion_port"`
-	BastionUser       types.String `tfsdk:"bastion_user"`
-	BastionPassword   types.String `tfsdk:"bastion_password"`
-	BastionPrivateKey types.String `tfsdk:"bastion_private_key"`
+	SSHConnectionModel
+	Bastion *SSHConnectionModel `tfsdk:"bastion"`
 }
 
 type SSHExecDataSourceModel struct {
@@ -37,7 +24,11 @@ type SSHExecDataSourceModel struct {
 	ExitCode      types.Int64  `tfsdk:"exit_code"`
 	FailIfNonzero types.Bool   `tfsdk:"fail_if_nonzero"`
 	Id            types.String `tfsdk:"id"`
+
+	// Connection details
 	SSHConnectionModel
+	UseProviderAsBastion types.Bool          `tfsdk:"use_provider_as_bastion"`
+	Bastion              *SSHConnectionModel `tfsdk:"bastion"`
 }
 
 type SSHExecResourceModel struct {
@@ -47,7 +38,11 @@ type SSHExecResourceModel struct {
 	FailIfNonzero types.Bool   `tfsdk:"fail_if_nonzero"`
 	OnDestroy     types.String `tfsdk:"on_destroy"`
 	Id            types.String `tfsdk:"id"`
+
+	// Connection details
 	SSHConnectionModel
+	UseProviderAsBastion types.Bool          `tfsdk:"use_provider_as_bastion"`
+	Bastion              *SSHConnectionModel `tfsdk:"bastion"`
 }
 
 type SSHFileDataSourceModel struct {
@@ -56,7 +51,11 @@ type SSHFileDataSourceModel struct {
 	Permissions  types.String `tfsdk:"permissions"`
 	FailIfAbsent types.Bool   `tfsdk:"fail_if_absent"`
 	Id           types.String `tfsdk:"id"`
+
+	// Connection details
 	SSHConnectionModel
+	UseProviderAsBastion types.Bool          `tfsdk:"use_provider_as_bastion"`
+	Bastion              *SSHConnectionModel `tfsdk:"bastion"`
 }
 
 type SSHFileResourceModel struct {
@@ -66,5 +65,9 @@ type SSHFileResourceModel struct {
 	FailIfAbsent    types.Bool   `tfsdk:"fail_if_absent"`
 	DeleteOnDestroy types.Bool   `tfsdk:"delete_on_destroy"`
 	Id              types.String `tfsdk:"id"`
+
+	// Connection details
 	SSHConnectionModel
+	UseProviderAsBastion types.Bool          `tfsdk:"use_provider_as_bastion"`
+	Bastion              *SSHConnectionModel `tfsdk:"bastion"`
 }

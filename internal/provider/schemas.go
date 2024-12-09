@@ -13,12 +13,9 @@ var SSHConnectionSchema = struct {
 	User                 rschema.StringAttribute
 	Password             rschema.StringAttribute
 	PrivateKey           rschema.StringAttribute
+	Port                 rschema.Int64Attribute
 	UseProviderAsBastion rschema.BoolAttribute
-	BastionHost          rschema.StringAttribute
-	BastionPort          rschema.Int64Attribute
-	BastionUser          rschema.StringAttribute
-	BastionPassword      rschema.StringAttribute
-	BastionPrivateKey    rschema.StringAttribute
+	Bastion              rschema.SingleNestedAttribute
 }{
 	Host: rschema.StringAttribute{
 		MarkdownDescription: "Override the provider's host configuration",
@@ -38,91 +35,89 @@ var SSHConnectionSchema = struct {
 		Optional:            true,
 		Sensitive:           true,
 	},
+	Port: rschema.Int64Attribute{
+		MarkdownDescription: "The port number to connect to",
+		Optional:            true,
+	},
 	UseProviderAsBastion: rschema.BoolAttribute{
 		MarkdownDescription: "Use the provider's connection as a bastion host",
 		Optional:            true,
 	},
-	BastionHost: rschema.StringAttribute{
-		MarkdownDescription: "The hostname or IP address of the bastion host",
+	Bastion: rschema.SingleNestedAttribute{
+		MarkdownDescription: "Bastion host configuration",
 		Optional:            true,
+		Attributes: map[string]rschema.Attribute{
+			"host": rschema.StringAttribute{
+				MarkdownDescription: "The hostname or IP address of the bastion host",
+				Required:            true,
+			},
+			"port": rschema.Int64Attribute{
+				MarkdownDescription: "The port number of the bastion host",
+				Optional:            true,
+			},
+			"user": rschema.StringAttribute{
+				MarkdownDescription: "The username for bastion host authentication",
+				Required:            true,
+			},
+			"password": rschema.StringAttribute{
+				MarkdownDescription: "The password for bastion host authentication",
+				Optional:            true,
+				Sensitive:           true,
+			},
+			"private_key": rschema.StringAttribute{
+				MarkdownDescription: "The private key for bastion host authentication",
+				Optional:            true,
+				Sensitive:           true,
+			},
+		},
 	},
-	BastionPort: rschema.Int64Attribute{
-		MarkdownDescription: "The port number of the bastion host",
-		Optional:            true,
-	},
-	BastionUser: rschema.StringAttribute{
-		MarkdownDescription: "The username for bastion host authentication",
-		Optional:            true,
-	},
-	BastionPassword: rschema.StringAttribute{
-		MarkdownDescription: "The password for bastion host authentication",
-		Optional:            true,
-		Sensitive:           true,
-	},
-	BastionPrivateKey: rschema.StringAttribute{
-		MarkdownDescription: "The private key for bastion host authentication",
-		Optional:            true,
-		Sensitive:           true,
+}
+
+var SSHBastionAttr = rschema.SingleNestedAttribute{
+	MarkdownDescription: "Bastion host configuration",
+	Optional:            true,
+	Attributes: map[string]rschema.Attribute{
+		"host":        SSHConnectionSchema.Host,
+		"port":        SSHConnectionSchema.Port,
+		"user":        SSHConnectionSchema.User,
+		"password":    SSHConnectionSchema.Password,
+		"private_key": SSHConnectionSchema.PrivateKey,
 	},
 }
 
 var SSHProviderAttrs = struct {
-	Host              pschema.StringAttribute
-	Port              pschema.Int64Attribute
-	User              pschema.StringAttribute
-	Password          pschema.StringAttribute
-	PrivateKey        pschema.StringAttribute
-	BastionHost       pschema.StringAttribute
-	BastionPort       pschema.Int64Attribute
-	BastionUser       pschema.StringAttribute
-	BastionPassword   pschema.StringAttribute
-	BastionPrivateKey pschema.StringAttribute
+	Host       rschema.StringAttribute
+	Port       rschema.Int64Attribute
+	User       rschema.StringAttribute
+	Password   rschema.StringAttribute
+	PrivateKey rschema.StringAttribute
+	Bastion    rschema.SingleNestedAttribute
 }{
-	Host: pschema.StringAttribute{
+	Host: rschema.StringAttribute{
 		MarkdownDescription: "The hostname or IP address of the target SSH server",
 		Required:            true,
 	},
-	Port: pschema.Int64Attribute{
+	Port: rschema.Int64Attribute{
 		MarkdownDescription: "The port number of the target SSH server",
 		Optional:            true,
 	},
-	User: pschema.StringAttribute{
+	User: rschema.StringAttribute{
 		MarkdownDescription: "The username for SSH authentication",
 		Required:            true,
 	},
-	Password: pschema.StringAttribute{
+	Password: rschema.StringAttribute{
 		MarkdownDescription: "The password for SSH authentication",
 		Optional:            true,
 		Sensitive:           true,
 	},
-	PrivateKey: pschema.StringAttribute{
+	PrivateKey: rschema.StringAttribute{
 		MarkdownDescription: "The private key for SSH authentication",
 		Optional:            true,
 		Sensitive:           true,
 	},
-	BastionHost: pschema.StringAttribute{
-		MarkdownDescription: "The hostname or IP address of the bastion host",
-		Optional:            true,
-	},
-	BastionPort: pschema.Int64Attribute{
-		MarkdownDescription: "The port number of the bastion host",
-		Optional:            true,
-	},
-	BastionUser: pschema.StringAttribute{
-		MarkdownDescription: "The username for bastion host authentication",
-		Optional:            true,
-	},
-	BastionPassword: pschema.StringAttribute{
-		MarkdownDescription: "The password for bastion host authentication",
-		Optional:            true,
-		Sensitive:           true,
-	},
-	BastionPrivateKey: pschema.StringAttribute{
-		MarkdownDescription: "The private key for bastion host authentication",
-		Optional:            true,
-		Sensitive:           true,
-	},
+	Bastion: SSHBastionAttr,
 }
+
 var SSHExecAttrs = struct {
 	Command                   rschema.StringAttribute
 	Output                    rschema.StringAttribute
@@ -209,16 +204,12 @@ var SSHFileAttrs = struct {
 
 var SSHProviderSchema = pschema.Schema{
 	Attributes: map[string]pschema.Attribute{
-		"host":                SSHProviderAttrs.Host,
-		"port":                SSHProviderAttrs.Port,
-		"user":                SSHProviderAttrs.User,
-		"password":            SSHProviderAttrs.Password,
-		"private_key":         SSHProviderAttrs.PrivateKey,
-		"bastion_host":        SSHProviderAttrs.BastionHost,
-		"bastion_port":        SSHProviderAttrs.BastionPort,
-		"bastion_user":        SSHProviderAttrs.BastionUser,
-		"bastion_password":    SSHProviderAttrs.BastionPassword,
-		"bastion_private_key": SSHProviderAttrs.BastionPrivateKey,
+		"host":        SSHProviderAttrs.Host,
+		"port":        SSHProviderAttrs.Port,
+		"user":        SSHProviderAttrs.User,
+		"password":    SSHProviderAttrs.Password,
+		"private_key": SSHProviderAttrs.PrivateKey,
+		"bastion":     SSHProviderAttrs.Bastion,
 	},
 }
 
@@ -238,11 +229,7 @@ var SSHExecResourceSchema = rschema.Schema{
 		"password":                SSHConnectionSchema.Password,
 		"private_key":             SSHConnectionSchema.PrivateKey,
 		"use_provider_as_bastion": SSHConnectionSchema.UseProviderAsBastion,
-		"bastion_host":            SSHConnectionSchema.BastionHost,
-		"bastion_port":            SSHConnectionSchema.BastionPort,
-		"bastion_user":            SSHConnectionSchema.BastionUser,
-		"bastion_password":        SSHConnectionSchema.BastionPassword,
-		"bastion_private_key":     SSHConnectionSchema.BastionPrivateKey,
+		"bastion":                 SSHConnectionSchema.Bastion,
 	},
 }
 
@@ -261,11 +248,7 @@ var SSHExecDataSourceSchema = dschema.Schema{
 		"password":                SSHConnectionSchema.Password,
 		"private_key":             SSHConnectionSchema.PrivateKey,
 		"use_provider_as_bastion": SSHConnectionSchema.UseProviderAsBastion,
-		"bastion_host":            SSHConnectionSchema.BastionHost,
-		"bastion_port":            SSHConnectionSchema.BastionPort,
-		"bastion_user":            SSHConnectionSchema.BastionUser,
-		"bastion_password":        SSHConnectionSchema.BastionPassword,
-		"bastion_private_key":     SSHConnectionSchema.BastionPrivateKey,
+		"bastion":                 SSHConnectionSchema.Bastion,
 	},
 }
 
@@ -285,11 +268,7 @@ var SSHFileResourceSchema = rschema.Schema{
 		"password":                SSHConnectionSchema.Password,
 		"private_key":             SSHConnectionSchema.PrivateKey,
 		"use_provider_as_bastion": SSHConnectionSchema.UseProviderAsBastion,
-		"bastion_host":            SSHConnectionSchema.BastionHost,
-		"bastion_port":            SSHConnectionSchema.BastionPort,
-		"bastion_user":            SSHConnectionSchema.BastionUser,
-		"bastion_password":        SSHConnectionSchema.BastionPassword,
-		"bastion_private_key":     SSHConnectionSchema.BastionPrivateKey,
+		"bastion":                 SSHConnectionSchema.Bastion,
 	},
 }
 
@@ -308,10 +287,6 @@ var SSHFileDataSourceSchema = dschema.Schema{
 		"password":                SSHConnectionSchema.Password,
 		"private_key":             SSHConnectionSchema.PrivateKey,
 		"use_provider_as_bastion": SSHConnectionSchema.UseProviderAsBastion,
-		"bastion_host":            SSHConnectionSchema.BastionHost,
-		"bastion_port":            SSHConnectionSchema.BastionPort,
-		"bastion_user":            SSHConnectionSchema.BastionUser,
-		"bastion_password":        SSHConnectionSchema.BastionPassword,
-		"bastion_private_key":     SSHConnectionSchema.BastionPrivateKey,
+		"bastion":                 SSHConnectionSchema.Bastion,
 	},
 }
