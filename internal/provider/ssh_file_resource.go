@@ -55,7 +55,7 @@ func (r *SSHFileResource) Create(ctx context.Context, req resource.CreateRequest
 	// Generate a unique, stable ID before writing the file
 	data.Id = types.StringValue(generateFileID(data.Path.ValueString(), time.Now()))
 
-	client, newClient, err := r.manager.GetClient(
+	client, err := r.manager.GetClient(
 		*data.SSHConnectionModel.toConfig(),
 		data.UseProviderAsBastion.ValueBool(),
 		data.Bastion.toConfig(),
@@ -64,10 +64,6 @@ func (r *SSHFileResource) Create(ctx context.Context, req resource.CreateRequest
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get SSH client", err.Error())
 		return
-	}
-
-	if newClient {
-		defer client.Close()
 	}
 
 	if err := writeFile(ctx, client, data.Path.ValueString(), data.Content.ValueString(), data.Permissions.ValueString()); err != nil {
@@ -86,7 +82,7 @@ func (r *SSHFileResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	client, newClient, err := r.manager.GetClient(
+	client, err := r.manager.GetClient(
 		*data.SSHConnectionModel.toConfig(),
 		data.UseProviderAsBastion.ValueBool(),
 		data.Bastion.toConfig(),
@@ -95,10 +91,6 @@ func (r *SSHFileResource) Read(ctx context.Context, req resource.ReadRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get SSH client", err.Error())
 		return
-	}
-
-	if newClient {
-		defer client.Close()
 	}
 
 	content, err := readFile(client, data.Path.ValueString())
@@ -130,7 +122,7 @@ func (r *SSHFileResource) Update(ctx context.Context, req resource.UpdateRequest
 	// Preserve the original ID from state
 	data.Id = state.Id
 
-	client, newClient, err := r.manager.GetClient(
+	client, err := r.manager.GetClient(
 		*data.SSHConnectionModel.toConfig(),
 		data.UseProviderAsBastion.ValueBool(),
 		data.Bastion.toConfig(),
@@ -139,10 +131,6 @@ func (r *SSHFileResource) Update(ctx context.Context, req resource.UpdateRequest
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get SSH client", err.Error())
 		return
-	}
-
-	if newClient {
-		defer client.Close()
 	}
 
 	if err := writeFile(ctx, client, data.Path.ValueString(), data.Content.ValueString(), data.Permissions.ValueString()); err != nil {
@@ -167,7 +155,7 @@ func (r *SSHFileResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	client, newClient, err := r.manager.GetClient(
+	client, err := r.manager.GetClient(
 		*data.SSHConnectionModel.toConfig(),
 		data.UseProviderAsBastion.ValueBool(),
 		data.Bastion.toConfig(),
@@ -176,10 +164,6 @@ func (r *SSHFileResource) Delete(ctx context.Context, req resource.DeleteRequest
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get SSH client", err.Error())
 		return
-	}
-
-	if newClient {
-		defer client.Close()
 	}
 
 	if err := deleteFile(client, data.Path.ValueString()); err != nil {

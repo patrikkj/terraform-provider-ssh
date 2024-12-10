@@ -117,6 +117,11 @@ data "ssh_exec" "nonzero_fail" {
   command = "false"
   fail_if_nonzero = true
 }
+
+data "ssh_exec" "nonzero_fail2" {
+  command = "false"
+  fail_if_nonzero = true
+}
 `, getEnvVarOrSkip(t, "SSH_HOST"), getEnvVarOrSkip(t, "SSH_USER"), getEnvVarOrSkip(t, "SSH_PASSWORD"))
 }
 

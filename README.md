@@ -6,19 +6,22 @@ A Terraform provider for executing commands and managing files over SSH.
 
 ```hcl
 provider "ssh" {
-  host              = "example.com"      # Required: SSH host
-  port              = 22                 # Optional: SSH port (default: 22)
-  user              = "username"         # Required: SSH username
-  password          = "password"         # Optional: SSH password
-  private_key       = "key_content"      # Optional: SSH private key content
+  host = "app.example.com"             # Required: Target host address
+  user = "admin"                       # Required: SSH username
+  private_key = file("~/.ssh/id_rsa")  # Required: Private key authentication
+  password = "your_password"           # Optional: Password authentication (alternative to private_key)
+  port = 22                            # Optional: SSH port (default: 22)
 
-  # Optional: Bastion/jump host configuration
-  bastion_host       = "bastion.example.com"
-  bastion_port       = 22
-  bastion_user       = "bastion_user"
-  bastion_password   = "bastion_password"
-  bastion_private_key = "bastion_key_content"
+  # Optional: Bastion configuration
+  bastion = {
+    host = "bastion.example.com"              # Required: Bastion host address
+    user = "bastion-user"                     # Required: Bastion username
+    private_key = file("~/.ssh/bastion_key")  # Required: Bastion authentication
+    password = "bastion_password"             # Optional: Password authentication (alternative to private_key)
+    port = 22                                 # Optional: Bastion port (default: 22)
+  }
 }
+
 ```
 
 ## Data Sources
@@ -27,12 +30,21 @@ provider "ssh" {
 
 ```hcl
 data "ssh_exec" "example" {
-  command         = "whoami"        # Required: Command to execute
-  fail_if_nonzero = true           # Optional: Fail if exit code is non-zero (default: true)
+  command = "systemctl status myapp"   # Required: Command to execute
+  fail_if_nonzero = true               # Optional: Fail on non-zero exit
+
+  # Optional: Connection overrides (same as resource)
+  # host = "different-host.example.com"         # Override provider host
+  # user = "different-user"                     # Override provider user
+  # private_key = file("~/.ssh/different_key")  # Override provider authentication
+  # use_provider_as_bastion = true              # Use provider's bastion
+  # bastion = { ... }                           # Custom bastion configuration
+
+  depends_on = [ssh_exec.service_deployment]  # Optional: Data source dependencies
 }
 
 # Available outputs:
-output "command_result" {
+output "example" {
   value = {
     stdout     = data.ssh_exec.example.output    # The command's output
     exit_code  = data.ssh_exec.example.exit_code # The command's exit code
@@ -44,13 +56,23 @@ output "command_result" {
 
 ```hcl
 data "ssh_file" "example" {
-  path          = "/path/to/file"   # Required: Remote file path
-  fail_if_absent = true             # Optional: Fail if file doesn't exist
+  path = "/etc/existing/config.yml"  # Required: Remote file path
+  fail_if_absent = false             # Optional: Don't fail if file is missing
+
+  # Optional: Connection overrides (same as resource)
+  # host = "different-host.example.com"         # Override provider host
+  # user = "different-user"                     # Override provider user
+  # private_key = file("~/.ssh/different_key")  # Override provider authentication
+  # use_provider_as_bastion = true              # Use provider's bastion
+  # bastion = { ... }                           # Custom bastion configuration
 }
 
 # Available outputs:
-output "file_content" {
-  value = data.ssh_file.example.content  # The file's content
+output "example" {
+  value = {
+    content = data.ssh_file.example.content      # The file's contents
+    id      = data.ssh_file.example.id          # Unique identifier for this file
+  }
 }
 ```
 
@@ -60,12 +82,27 @@ output "file_content" {
 
 ```hcl
 resource "ssh_exec" "example" {
-  command         = "echo 'hello world'"    # Required: Command to execute
-  fail_if_nonzero = true                   # Optional: Fail if exit code is non-zero (default: true)
+  # Required: Command to execute
+  command = <<-EOT
+    systemctl daemon-reload
+    systemctl restart myapp
+  EOT
+
+  on_destroy = "systemctl stop myapp"  # Optional: Command to run on destruction
+  fail_if_nonzero = true               # Optional: Fail on non-zero exit (defaults to true)
+
+  # Optional: Connection overrides (same as file resource)
+  # host = "different-host.example.com"         # Override provider host
+  # user = "different-user"                     # Override provider user
+  # private_key = file("~/.ssh/different_key")  # Override provider authentication
+  # use_provider_as_bastion = true              # Use provider's bastion
+  # bastion = { ... }                           # Custom bastion configuration
+
+  depends_on = [ssh_file.app_config]   # Optional: Resource dependencies
 }
 
 # Available outputs:
-output "command_result" {
+output "example" {
   value = {
     output     = ssh_exec.example.output    # The command's output
     exit_code  = ssh_exec.example.exit_code # The command's exit code
@@ -78,17 +115,40 @@ output "command_result" {
 
 ```hcl
 resource "ssh_file" "example" {
-  path        = "/path/to/file"     # Required: Remote file path
-  content     = "file content"      # Required: File content
-  permissions = "0644"              # Optional: File permissions (default: "0644")
+  path = "/etc/myapp/config.json"  # Required: Remote file path
+
+  # Required: File content
+  content = jsonencode({
+    database_url = "postgresql://db.internal:5432/myapp"
+    api_key      = var.api_key
+    environment  = var.environment
+  })
+
+  permissions = "0644"             # Optional: File permissions (defaults to "0644")
+  delete_on_destroy = true         # Optional: Whether to delete on destroy (defaults to true)
+
+  # Optional: Override provider connection settings
+  # host = "different-host.example.com"         # Override provider host
+  # user = "different-user"                     # Override provider user
+  # private_key = file("~/.ssh/different_key")  # Override provider authentication
+  # port = 2222                                 # Override provider port
+
+  # use_provider_as_bastion = true              # Optional: Use provider's bastion as jump host
+
+  # Optional: Custom bastion configuration (overrides provider's bastion)
+  # bastion = {
+  #   host        = "custom-jump.example.com"
+  #   user        = "jump-user"
+  #   private_key = file("~/.ssh/jump_key")
+  #   port        = 22
+  # }
 }
 
 # Available outputs:
-output "file_info" {
+output "example" {
   value = {
-    id          = ssh_file.example.id          # Unique identifier (same as path)
-    path        = ssh_file.example.path        # Path to the file
-    permissions = ssh_file.example.permissions # File permissions
+    content = data.ssh_file.example.content      # The file's contents
+    id      = data.ssh_file.example.id           # Unique identifier for this file
   }
 }
 ```

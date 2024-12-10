@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/fs"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -52,13 +51,8 @@ func readFile(client *ssh.Client, path string) (string, error) {
 		return "", fmt.Errorf("failed to read file contents: %w", err)
 	}
 
-	// Strip trailing newline when reading
-	contentStr := string(content)
-	if len(contentStr) > 0 && strings.HasSuffix(contentStr, "\n") {
-		contentStr = contentStr[:len(contentStr)-1]
-	}
-
-	return contentStr, nil
+	// Return content as-is, preserving newlines
+	return string(content), nil
 }
 
 // writeFile writes content to a file over SFTP
@@ -82,12 +76,7 @@ func writeFile(ctx context.Context, client *ssh.Client, path, content string, pe
 	}
 	defer f.Close()
 
-	// Ensure content ends with newline
-	if len(content) > 0 && !strings.HasSuffix(content, "\n") {
-		content += "\n"
-	}
-
-	// Write content
+	// Write content as-is, without modifying newlines
 	if _, err := f.Write([]byte(content)); err != nil {
 		return fmt.Errorf("failed to write file content: %w", err)
 	}

@@ -61,7 +61,7 @@ func (d *SSHExecDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	data.Id = types.StringValue(generateExecID(data.Command.ValueString(), time.Now()))
 
 	// Get SSH client
-	client, newClient, err := d.manager.GetClient(
+	client, err := d.manager.GetClient(
 		*data.SSHConnectionModel.toConfig(),
 		data.UseProviderAsBastion.ValueBool(),
 		data.Bastion.toConfig(),
@@ -70,10 +70,6 @@ func (d *SSHExecDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get SSH client", err.Error())
 		return
-	}
-
-	if newClient {
-		defer client.Close()
 	}
 
 	// Execute the command
