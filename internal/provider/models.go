@@ -111,3 +111,20 @@ type SSHFileResourceModel struct {
 	UseProviderAsBastion types.Bool          `tfsdk:"use_provider_as_bastion"`
 	Bastion              *SSHConnectionModel `tfsdk:"bastion"`
 }
+
+type SSHConfigLine struct {
+	Key         types.String    `tfsdk:"key"`
+	Value       types.String    `tfsdk:"value"`
+	Indent      types.String    `tfsdk:"indent"`
+	Sep         types.String    `tfsdk:"sep"`
+	Comment     types.String    `tfsdk:"comment"`
+	TrailIndent types.String    `tfsdk:"trail_indent"`
+	Children    []SSHConfigLine `tfsdk:"children"`
+}
+
+type SSHConfigDataSourceModel struct {
+	Path    types.String    `tfsdk:"path"`
+	Content types.String    `tfsdk:"content"`
+	Lines   []SSHConfigLine `tfsdk:"lines"`
+	Id      types.String    `tfsdk:"id"`
+}

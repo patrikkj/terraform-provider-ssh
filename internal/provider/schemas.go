@@ -95,7 +95,7 @@ var SSHProviderAttrs = struct {
 }{
 	Host: rschema.StringAttribute{
 		MarkdownDescription: "The hostname or IP address of the target SSH server",
-		Required:            true,
+		Optional:            true,
 	},
 	Port: rschema.Int64Attribute{
 		MarkdownDescription: "The port number of the target SSH server",
@@ -103,7 +103,7 @@ var SSHProviderAttrs = struct {
 	},
 	User: rschema.StringAttribute{
 		MarkdownDescription: "The username for SSH authentication",
-		Required:            true,
+		Optional:            true,
 	},
 	Password: rschema.StringAttribute{
 		MarkdownDescription: "The password for SSH authentication",
@@ -292,5 +292,108 @@ var SSHFileDataSourceSchema = dschema.Schema{
 		"port":                    SSHConnectionSchema.Port,
 		"use_provider_as_bastion": SSHConnectionSchema.UseProviderAsBastion,
 		"bastion":                 SSHConnectionSchema.Bastion,
+	},
+}
+
+var SSHConfigLineAttrs = struct {
+	Key         dschema.StringAttribute
+	Value       dschema.StringAttribute
+	Indent      dschema.StringAttribute
+	Sep         dschema.StringAttribute
+	Comment     dschema.StringAttribute
+	TrailIndent dschema.StringAttribute
+	Children    dschema.ListNestedAttribute
+}{
+	Key: dschema.StringAttribute{
+		MarkdownDescription: "The key/directive of the config line",
+		Computed:            true,
+	},
+	Value: dschema.StringAttribute{
+		MarkdownDescription: "The value of the config line",
+		Computed:            true,
+	},
+	Indent: dschema.StringAttribute{
+		MarkdownDescription: "The indentation before the key",
+		Computed:            true,
+	},
+	Sep: dschema.StringAttribute{
+		MarkdownDescription: "The separator between key and value",
+		Computed:            true,
+	},
+	Comment: dschema.StringAttribute{
+		MarkdownDescription: "Any comment on the line",
+		Computed:            true,
+	},
+	TrailIndent: dschema.StringAttribute{
+		MarkdownDescription: "Any trailing indentation",
+		Computed:            true,
+	},
+}
+
+var SSHConfigChildrenAttr = dschema.ListNestedAttribute{
+	MarkdownDescription: "SSH config children",
+	Optional:            true,
+	NestedObject: dschema.NestedAttributeObject{
+		Attributes: map[string]dschema.Attribute{
+			"key":          SSHConfigLineAttrs.Key,
+			"value":        SSHConfigLineAttrs.Value,
+			"indent":       SSHConfigLineAttrs.Indent,
+			"sep":          SSHConfigLineAttrs.Sep,
+			"comment":      SSHConfigLineAttrs.Comment,
+			"trail_indent": SSHConfigLineAttrs.TrailIndent,
+			// Add dummy children, make it an empty attribute
+			"children": dschema.ListNestedAttribute{
+				MarkdownDescription: "SSH config children",
+				Optional:            true,
+				NestedObject:        dschema.NestedAttributeObject{},
+			},
+		},
+	},
+}
+
+var SSHConfigLineSchema = dschema.NestedAttributeObject{
+	Attributes: map[string]dschema.Attribute{
+		"key":          SSHConfigLineAttrs.Key,
+		"value":        SSHConfigLineAttrs.Value,
+		"indent":       SSHConfigLineAttrs.Indent,
+		"sep":          SSHConfigLineAttrs.Sep,
+		"comment":      SSHConfigLineAttrs.Comment,
+		"trail_indent": SSHConfigLineAttrs.TrailIndent,
+		"children":     SSHConfigChildrenAttr,
+	},
+}
+
+var SSHConfigAttrs = struct {
+	Path    dschema.StringAttribute
+	Content dschema.StringAttribute
+	Lines   dschema.ListNestedAttribute
+	ID      dschema.StringAttribute
+}{
+	Path: dschema.StringAttribute{
+		MarkdownDescription: "Path to the SSH config file",
+		Required:            true,
+	},
+	Content: dschema.StringAttribute{
+		MarkdownDescription: "Raw content of the SSH config file",
+		Computed:            true,
+	},
+	Lines: dschema.ListNestedAttribute{
+		MarkdownDescription: "Parsed SSH config lines",
+		Computed:            true,
+		NestedObject:        SSHConfigLineSchema,
+	},
+	ID: dschema.StringAttribute{
+		MarkdownDescription: "Unique identifier for this SSH config",
+		Computed:            true,
+	},
+}
+
+var SSHConfigDataSourceSchema = dschema.Schema{
+	MarkdownDescription: "Read and parse SSH config files",
+	Attributes: map[string]dschema.Attribute{
+		"path":    SSHConfigAttrs.Path,
+		"content": SSHConfigAttrs.Content,
+		"lines":   SSHConfigAttrs.Lines,
+		"id":      SSHConfigAttrs.ID,
 	},
 }

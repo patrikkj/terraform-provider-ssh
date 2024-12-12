@@ -69,6 +69,7 @@ func (p *SSHProvider) DataSources(ctx context.Context) []func() datasource.DataS
 	return []func() datasource.DataSource{
 		NewSSHExecDataSource,
 		NewSSHFileDataSource,
+		NewSSHConfigDataSource,
 	}
 }
 
