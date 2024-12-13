@@ -1,6 +1,10 @@
 package provider
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/patrikkj/sshconf"
@@ -73,4 +77,59 @@ func (l SSHConfigLine) toAttrValue() attr.Value {
 			"children":     l.Children,
 		},
 	)
+}
+
+// Add these new utility functions
+
+func expandPath(path string) (string, error) {
+	if path[0] == '~' {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to expand home directory: %w", err)
+		}
+		return filepath.Join(home, path[1:]), nil
+	}
+	return path, nil
+}
+
+func readOrCreateConfig(path string) (*sshconf.SSHConfig, error) {
+	expandedPath, err := expandPath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	config, err := sshconf.ParseConfigFile(expandedPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to read SSH config file: %w", err)
+		}
+		// Create new empty config if file doesn't exist
+		return sshconf.ParseConfig(""), nil
+	}
+	return config, nil
+}
+
+func updateModelFromConfig(config *sshconf.SSHConfig) (types.String, types.List, error) {
+	content := config.Render()
+
+	// Convert the lines to our model format
+	lines := make([]SSHConfigLine, len(config.Lines()))
+	for i, line := range config.Lines() {
+		lines[i] = convertSSHConfLine(line)
+	}
+
+	lineValues := make([]attr.Value, len(lines))
+	for i, line := range lines {
+		lineValues[i] = line.toAttrValue()
+	}
+
+	linesList, diags := types.ListValue(
+		sshConfigLineObjectType,
+		lineValues,
+	)
+	if diags.HasError() {
+		return types.String{}, types.List{}, fmt.Errorf("failed to create lines list: %v", diags)
+	}
+
+	return types.StringValue(content), linesList, nil
 }

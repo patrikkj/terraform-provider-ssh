@@ -42,67 +42,38 @@ func (r *SSHConfigResource) Create(ctx context.Context, req resource.CreateReque
 	// Generate a unique ID based on the path and timestamp
 	data.Id = types.StringValue(generateFileID(data.Path.ValueString(), time.Now()))
 
-	// Expand the path (handle ~)
-	path := data.Path.ValueString()
-	if path[0] == '~' {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to expand home directory", err.Error())
-			return
-		}
-		path = filepath.Join(home, path[1:])
+	// Read or create config and apply patch
+	config, err := readOrCreateConfig(data.Path.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to read/create SSH config", err.Error())
+		return
 	}
 
-	// Read or create the config file
-	config, err := sshconf.ParseConfigFile(path)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			resp.Diagnostics.AddError("Failed to read SSH config file", err.Error())
-			return
-		}
-		// Create new empty config if file doesn't exist
-		config = sshconf.ParseConfig("")
-	}
-
-	// Apply the patch
-	err = config.Patch(data.Find.ValueString(), data.Patch.ValueString())
-	if err != nil {
+	if err := config.Patch(data.Find.ValueString(), data.Patch.ValueString()); err != nil {
 		resp.Diagnostics.AddError("Failed to apply SSH config patch", err.Error())
 		return
 	}
 
-	// Write the config back to file
-	err = config.WriteFile(path)
+	expandedPath, err := expandPath(data.Path.ValueString())
 	if err != nil {
+		resp.Diagnostics.AddError("Path expansion failed", err.Error())
+		return
+	}
+
+	if err := config.WriteFile(expandedPath); err != nil {
 		resp.Diagnostics.AddError("Failed to write SSH config file", err.Error())
 		return
 	}
 
-	// Update the content and lines in the model
-	content := config.Render()
-
-	// Convert the lines to our model format
-	lines := make([]SSHConfigLine, len(config.Lines()))
-	for i, line := range config.Lines() {
-		lines[i] = convertSSHConfLine(line)
-	}
-
-	lineValues := make([]attr.Value, len(lines))
-	for i, line := range lines {
-		lineValues[i] = line.toAttrValue()
-	}
-
-	linesList, diags := types.ListValue(
-		sshConfigLineObjectType,
-		lineValues,
-	)
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
+	// Update model content and lines
+	content, lines, err := updateModelFromConfig(config)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update model", err.Error())
 		return
 	}
 
-	data.Content = types.StringValue(content)
-	data.Lines = linesList
+	data.Content = content
+	data.Lines = lines
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -174,63 +145,38 @@ func (r *SSHConfigResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	// Expand the path (handle ~)
-	path := data.Path.ValueString()
-	if path[0] == '~' {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to expand home directory", err.Error())
-			return
-		}
-		path = filepath.Join(home, path[1:])
-	}
-
-	// Read the config file
-	config, err := sshconf.ParseConfigFile(path)
+	// Read or create config and apply patch
+	config, err := readOrCreateConfig(data.Path.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to read SSH config file", err.Error())
+		resp.Diagnostics.AddError("Failed to read/create SSH config", err.Error())
 		return
 	}
 
-	// Apply the patch
-	err = config.Patch(data.Find.ValueString(), data.Patch.ValueString())
-	if err != nil {
+	if err := config.Patch(data.Find.ValueString(), data.Patch.ValueString()); err != nil {
 		resp.Diagnostics.AddError("Failed to apply SSH config patch", err.Error())
 		return
 	}
 
-	// Write the config back to file
-	err = config.WriteFile(path)
+	expandedPath, err := expandPath(data.Path.ValueString())
 	if err != nil {
+		resp.Diagnostics.AddError("Path expansion failed", err.Error())
+		return
+	}
+
+	if err := config.WriteFile(expandedPath); err != nil {
 		resp.Diagnostics.AddError("Failed to write SSH config file", err.Error())
 		return
 	}
 
-	// Update the content and lines in the model
-	content := config.Render()
-
-	// Convert the lines to our model format
-	lines := make([]SSHConfigLine, len(config.Lines()))
-	for i, line := range config.Lines() {
-		lines[i] = convertSSHConfLine(line)
-	}
-
-	lineValues := make([]attr.Value, len(lines))
-	for i, line := range lines {
-		lineValues[i] = line.toAttrValue()
-	}
-
-	linesList, diags := types.ListValue(
-		sshConfigLineObjectType,
-		lineValues,
-	)
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
+	// Update model content and lines
+	content, lines, err := updateModelFromConfig(config)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update model", err.Error())
 		return
 	}
 
-	data.Content = types.StringValue(content)
-	data.Lines = linesList
+	data.Content = content
+	data.Lines = lines
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

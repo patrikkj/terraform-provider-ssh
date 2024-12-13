@@ -2,14 +2,10 @@ package provider
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"time"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/patrikkj/sshconf"
 )
 
 var _ datasource.DataSource = &SSHConfigDataSource{}
@@ -42,51 +38,21 @@ func (d *SSHConfigDataSource) Read(ctx context.Context, req datasource.ReadReque
 	// Generate a unique ID based on the path and timestamp
 	data.Id = types.StringValue(generateFileID(data.Path.ValueString(), time.Now()))
 
-	// Expand the path (handle ~)
-	path := data.Path.ValueString()
-	if path[0] == '~' {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to expand home directory", err.Error())
-			return
-		}
-		path = filepath.Join(home, path[1:])
-	}
-
-	// Read the file content
-	content, err := os.ReadFile(path)
+	config, err := readOrCreateConfig(data.Path.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to read SSH config file", err.Error())
+		resp.Diagnostics.AddError("Failed to read SSH config", err.Error())
 		return
 	}
 
-	// Parse the SSH config
-	config := sshconf.ParseConfig(string(content))
-
-	// Convert the lines to our model format
-	lines := make([]SSHConfigLine, len(config.Lines()))
-	for i, line := range config.Lines() {
-		lines[i] = convertSSHConfLine(line)
-	}
-
-	// Convert the lines to attr.Value
-	lineValues := make([]attr.Value, len(lines))
-	for i, line := range lines {
-		lineValues[i] = line.toAttrValue()
-	}
-
-	linesList, diags := types.ListValue(
-		sshConfigLineObjectType,
-		lineValues,
-	)
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
+	// Update model content and lines
+	content, lines, err := updateModelFromConfig(config)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update model", err.Error())
 		return
 	}
 
-	// Set the values
-	data.Content = types.StringValue(string(content))
-	data.Lines = linesList
+	data.Content = content
+	data.Lines = lines
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
