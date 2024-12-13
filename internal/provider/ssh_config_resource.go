@@ -93,17 +93,7 @@ func (r *SSHConfigResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	linesList, diags := types.ListValue(
-		types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"key":          types.StringType,
-				"value":        types.StringType,
-				"indent":       types.StringType,
-				"sep":          types.StringType,
-				"comment":      types.StringType,
-				"trail_indent": types.StringType,
-				"children":     types.ListType{ElemType: types.ObjectType{}},
-			},
-		},
+		sshConfigLineObjectType,
 		lineValues,
 	)
 	if diags.HasError() {
@@ -162,17 +152,7 @@ func (r *SSHConfigResource) Read(ctx context.Context, req resource.ReadRequest, 
 	}
 
 	linesList, diags := types.ListValue(
-		types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"key":          types.StringType,
-				"value":        types.StringType,
-				"indent":       types.StringType,
-				"sep":          types.StringType,
-				"comment":      types.StringType,
-				"trail_indent": types.StringType,
-				"children":     types.ListType{ElemType: types.ObjectType{}},
-			},
-		},
+		sshConfigLineObjectType,
 		lineValues,
 	)
 	if diags.HasError() {
@@ -241,17 +221,7 @@ func (r *SSHConfigResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	linesList, diags := types.ListValue(
-		types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"key":          types.StringType,
-				"value":        types.StringType,
-				"indent":       types.StringType,
-				"sep":          types.StringType,
-				"comment":      types.StringType,
-				"trail_indent": types.StringType,
-				"children":     types.ListType{ElemType: types.ObjectType{}},
-			},
-		},
+		sshConfigLineObjectType,
 		lineValues,
 	)
 	if diags.HasError() {

@@ -6,6 +6,32 @@ import (
 	"github.com/patrikkj/sshconf"
 )
 
+// Define the base attributes that will be used in both the main object and children
+var sshConfigLineAttrTypes = map[string]attr.Type{
+	"key":          types.StringType,
+	"value":        types.StringType,
+	"indent":       types.StringType,
+	"sep":          types.StringType,
+	"comment":      types.StringType,
+	"trail_indent": types.StringType,
+}
+
+// Create the object type with the recursive children structure
+var sshConfigLineObjectType = types.ObjectType{
+	AttrTypes: func() map[string]attr.Type {
+		attrs := make(map[string]attr.Type)
+		for k, v := range sshConfigLineAttrTypes {
+			attrs[k] = v
+		}
+		attrs["children"] = types.ListType{
+			ElemType: types.ObjectType{
+				AttrTypes: sshConfigLineAttrTypes,
+			},
+		}
+		return attrs
+	}(),
+}
+
 func convertSSHConfLine(line sshconf.Line) SSHConfigLine {
 	// Convert children to []attr.Value
 	childrenValues := make([]attr.Value, len(line.Children))
@@ -17,15 +43,7 @@ func convertSSHConfLine(line sshconf.Line) SSHConfigLine {
 	// Create types.List for children
 	childrenList, _ := types.ListValue(
 		types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"key":          types.StringType,
-				"value":        types.StringType,
-				"indent":       types.StringType,
-				"sep":          types.StringType,
-				"comment":      types.StringType,
-				"trail_indent": types.StringType,
-				"children":     types.ListType{ElemType: types.ObjectType{}}, // Empty object type for children
-			},
+			AttrTypes: sshConfigLineAttrTypes,
 		},
 		childrenValues,
 	)
@@ -44,15 +62,7 @@ func convertSSHConfLine(line sshconf.Line) SSHConfigLine {
 // Helper method to convert SSHConfigLine to attr.Value
 func (l SSHConfigLine) toAttrValue() attr.Value {
 	return types.ObjectValueMust(
-		map[string]attr.Type{
-			"key":          types.StringType,
-			"value":        types.StringType,
-			"indent":       types.StringType,
-			"sep":          types.StringType,
-			"comment":      types.StringType,
-			"trail_indent": types.StringType,
-			"children":     types.ListType{ElemType: types.ObjectType{}}, // Empty object type for children
-		},
+		sshConfigLineObjectType.AttrTypes,
 		map[string]attr.Value{
 			"key":          l.Key,
 			"value":        l.Value,
