@@ -6,7 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 )
 
-var SSHConfigLineAttrs = struct {
+var SSHConfigAttrs = struct {
 	Key         dschema.StringAttribute
 	Value       dschema.StringAttribute
 	Indent      dschema.StringAttribute
@@ -14,6 +14,13 @@ var SSHConfigLineAttrs = struct {
 	Comment     dschema.StringAttribute
 	TrailIndent dschema.StringAttribute
 	Children    dschema.ListNestedAttribute
+
+	Path            dschema.StringAttribute
+	Content         dschema.StringAttribute
+	ID              dschema.StringAttribute
+	Patch           dschema.StringAttribute
+	Find            dschema.StringAttribute
+	DeleteOnDestroy rschema.BoolAttribute
 }{
 	Key: dschema.StringAttribute{
 		MarkdownDescription: "The key/directive of the config line",
@@ -39,50 +46,6 @@ var SSHConfigLineAttrs = struct {
 		MarkdownDescription: "Any trailing indentation",
 		Computed:            true,
 	},
-}
-
-var SSHConfigChildrenAttr = dschema.ListNestedAttribute{
-	MarkdownDescription: "SSH config children",
-	Optional:            true,
-	NestedObject: dschema.NestedAttributeObject{
-		Attributes: map[string]dschema.Attribute{
-			"key":          SSHConfigLineAttrs.Key,
-			"value":        SSHConfigLineAttrs.Value,
-			"indent":       SSHConfigLineAttrs.Indent,
-			"sep":          SSHConfigLineAttrs.Sep,
-			"comment":      SSHConfigLineAttrs.Comment,
-			"trail_indent": SSHConfigLineAttrs.TrailIndent,
-			// Add dummy children, make it an empty attribute
-			"children": dschema.ListNestedAttribute{
-				MarkdownDescription: "SSH config children",
-				Optional:            true,
-				NestedObject:        dschema.NestedAttributeObject{},
-			},
-		},
-	},
-}
-
-var SSHConfigLineSchema = dschema.NestedAttributeObject{
-	Attributes: map[string]dschema.Attribute{
-		"key":          SSHConfigLineAttrs.Key,
-		"value":        SSHConfigLineAttrs.Value,
-		"indent":       SSHConfigLineAttrs.Indent,
-		"sep":          SSHConfigLineAttrs.Sep,
-		"comment":      SSHConfigLineAttrs.Comment,
-		"trail_indent": SSHConfigLineAttrs.TrailIndent,
-		"children":     SSHConfigChildrenAttr,
-	},
-}
-
-var SSHConfigAttrs = struct {
-	Path            dschema.StringAttribute
-	Content         dschema.StringAttribute
-	Lines           dschema.ListNestedAttribute
-	ID              dschema.StringAttribute
-	Patch           dschema.StringAttribute
-	Find            dschema.StringAttribute
-	DeleteOnDestroy rschema.BoolAttribute
-}{
 	Path: dschema.StringAttribute{
 		MarkdownDescription: "Path to the SSH config file",
 		Required:            true,
@@ -90,11 +53,6 @@ var SSHConfigAttrs = struct {
 	Content: dschema.StringAttribute{
 		MarkdownDescription: "Raw content of the SSH config file",
 		Computed:            true,
-	},
-	Lines: dschema.ListNestedAttribute{
-		MarkdownDescription: "Parsed SSH config lines",
-		Computed:            true,
-		NestedObject:        SSHConfigLineSchema,
 	},
 	ID: dschema.StringAttribute{
 		MarkdownDescription: "Unique identifier for this SSH config",
@@ -116,12 +74,41 @@ var SSHConfigAttrs = struct {
 	},
 }
 
+var SSHConfigLineSchema = dschema.ListNestedAttribute{
+	MarkdownDescription: "Parsed SSH config lines",
+	Computed:            true,
+	NestedObject: dschema.NestedAttributeObject{
+		Attributes: map[string]dschema.Attribute{
+			"key":          SSHConfigAttrs.Key,
+			"value":        SSHConfigAttrs.Value,
+			"indent":       SSHConfigAttrs.Indent,
+			"sep":          SSHConfigAttrs.Sep,
+			"comment":      SSHConfigAttrs.Comment,
+			"trail_indent": SSHConfigAttrs.TrailIndent,
+			"children": dschema.ListNestedAttribute{
+				MarkdownDescription: "SSH config children",
+				Optional:            true,
+				NestedObject: dschema.NestedAttributeObject{
+					Attributes: map[string]dschema.Attribute{
+						"key":          SSHConfigAttrs.Key,
+						"value":        SSHConfigAttrs.Value,
+						"indent":       SSHConfigAttrs.Indent,
+						"sep":          SSHConfigAttrs.Sep,
+						"comment":      SSHConfigAttrs.Comment,
+						"trail_indent": SSHConfigAttrs.TrailIndent,
+					},
+				},
+			},
+		},
+	},
+}
+
 var SSHConfigDataSourceSchema = dschema.Schema{
 	MarkdownDescription: "Read and parse SSH config files",
 	Attributes: map[string]dschema.Attribute{
 		"path":    SSHConfigAttrs.Path,
 		"content": SSHConfigAttrs.Content,
-		"lines":   SSHConfigAttrs.Lines,
+		"lines":   SSHConfigLineSchema,
 		"id":      SSHConfigAttrs.ID,
 	},
 }
@@ -134,7 +121,7 @@ var SSHConfigResourceSchema = rschema.Schema{
 		"patch":             SSHConfigAttrs.Patch,
 		"find":              SSHConfigAttrs.Find,
 		"delete_on_destroy": SSHConfigAttrs.DeleteOnDestroy,
-		"lines":             SSHConfigAttrs.Lines,
+		"lines":             SSHConfigLineSchema,
 		"id":                SSHConfigAttrs.ID,
 	},
 }
