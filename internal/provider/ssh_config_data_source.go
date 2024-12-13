@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/patrikkj/sshconf"
@@ -28,23 +29,6 @@ func (d *SSHConfigDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 }
 
 func (d *SSHConfigDataSource) Configure(_ context.Context, _ datasource.ConfigureRequest, _ *datasource.ConfigureResponse) {
-}
-
-func convertSSHConfLine(line sshconf.Line) SSHConfigLine {
-	children := make([]SSHConfigLine, len(line.Children))
-	for i, child := range line.Children {
-		children[i] = convertSSHConfLine(child)
-	}
-
-	return SSHConfigLine{
-		Key:         types.StringValue(line.Key),
-		Value:       types.StringValue(line.Value),
-		Indent:      types.StringValue(line.Indent),
-		Sep:         types.StringValue(line.Sep),
-		Comment:     types.StringValue(line.Comment),
-		TrailIndent: types.StringValue(line.TrailIndent),
-		Children:    children,
-	}
 }
 
 func (d *SSHConfigDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -85,9 +69,34 @@ func (d *SSHConfigDataSource) Read(ctx context.Context, req datasource.ReadReque
 		lines[i] = convertSSHConfLine(line)
 	}
 
+	// Convert the lines to attr.Value
+	lineValues := make([]attr.Value, len(lines))
+	for i, line := range lines {
+		lineValues[i] = line.toAttrValue()
+	}
+
+	linesList, diags := types.ListValue(
+		types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"key":          types.StringType,
+				"value":        types.StringType,
+				"indent":       types.StringType,
+				"sep":          types.StringType,
+				"comment":      types.StringType,
+				"trail_indent": types.StringType,
+				"children":     types.ListType{ElemType: types.ObjectType{}},
+			},
+		},
+		lineValues,
+	)
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
+
 	// Set the values
 	data.Content = types.StringValue(string(content))
-	data.Lines = lines
+	data.Lines = linesList
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

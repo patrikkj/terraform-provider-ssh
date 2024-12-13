@@ -364,10 +364,13 @@ var SSHConfigLineSchema = dschema.NestedAttributeObject{
 }
 
 var SSHConfigAttrs = struct {
-	Path    dschema.StringAttribute
-	Content dschema.StringAttribute
-	Lines   dschema.ListNestedAttribute
-	ID      dschema.StringAttribute
+	Path            dschema.StringAttribute
+	Content         dschema.StringAttribute
+	Lines           dschema.ListNestedAttribute
+	ID              dschema.StringAttribute
+	Patch           dschema.StringAttribute
+	Find            dschema.StringAttribute
+	DeleteOnDestroy rschema.BoolAttribute
 }{
 	Path: dschema.StringAttribute{
 		MarkdownDescription: "Path to the SSH config file",
@@ -386,6 +389,20 @@ var SSHConfigAttrs = struct {
 		MarkdownDescription: "Unique identifier for this SSH config",
 		Computed:            true,
 	},
+	Patch: dschema.StringAttribute{
+		MarkdownDescription: "The SSH config patch to apply",
+		Required:            true,
+	},
+	Find: dschema.StringAttribute{
+		MarkdownDescription: "The line to find and patch (e.g., 'Host example')",
+		Required:            true,
+	},
+	DeleteOnDestroy: rschema.BoolAttribute{
+		MarkdownDescription: "Whether to delete the patched section when the resource is destroyed",
+		Optional:            true,
+		Computed:            true,
+		Default:             booldefault.StaticBool(true),
+	},
 }
 
 var SSHConfigDataSourceSchema = dschema.Schema{
@@ -395,5 +412,18 @@ var SSHConfigDataSourceSchema = dschema.Schema{
 		"content": SSHConfigAttrs.Content,
 		"lines":   SSHConfigAttrs.Lines,
 		"id":      SSHConfigAttrs.ID,
+	},
+}
+
+var SSHConfigResourceSchema = rschema.Schema{
+	MarkdownDescription: "Manage SSH config files",
+	Attributes: map[string]rschema.Attribute{
+		"path":              SSHConfigAttrs.Path,
+		"content":           SSHConfigAttrs.Content,
+		"patch":             SSHConfigAttrs.Patch,
+		"find":              SSHConfigAttrs.Find,
+		"delete_on_destroy": SSHConfigAttrs.DeleteOnDestroy,
+		"lines":             SSHConfigAttrs.Lines,
+		"id":                SSHConfigAttrs.ID,
 	},
 }
