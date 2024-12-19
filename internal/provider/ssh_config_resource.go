@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -38,28 +37,27 @@ func (r *SSHConfigResource) Create(ctx context.Context, req resource.CreateReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	native := data.toValues()
+	data.Id = types.StringValue(generateFileID(native.Path, time.Now()))
 
-	// Generate a unique ID based on the path and timestamp
-	data.Id = types.StringValue(generateFileID(data.Path.ValueString(), time.Now()))
+	// Ensure DeleteOnDestroy is set to the schema default if not specified
+	if data.DeleteOnDestroy.IsNull() {
+		data.DeleteOnDestroy = types.BoolValue(true)
+	}
 
 	// Read or create config and apply patch
-	config, err := readOrCreateConfig(data.Path.ValueString())
+	config, err := readOrCreateConfig(native.Path)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to read/create SSH config", err.Error())
 		return
 	}
-
-	if err := config.Patch(data.Find.ValueString(), data.Patch.ValueString()); err != nil {
+	if err := config.Patch(native.Find, native.Patch); err != nil {
 		resp.Diagnostics.AddError("Failed to apply SSH config patch", err.Error())
 		return
 	}
 
-	expandedPath, err := expandPath(data.Path.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Path expansion failed", err.Error())
-		return
-	}
-
+	// Write the config to file
+	expandedPath := expandPath(native.Path)
 	if err := config.WriteFile(expandedPath); err != nil {
 		resp.Diagnostics.AddError("Failed to write SSH config file", err.Error())
 		return
@@ -87,15 +85,7 @@ func (r *SSHConfigResource) Read(ctx context.Context, req resource.ReadRequest, 
 	}
 
 	// Expand the path (handle ~)
-	path := data.Path.ValueString()
-	if path[0] == '~' {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to expand home directory", err.Error())
-			return
-		}
-		path = filepath.Join(home, path[1:])
-	}
+	path := expandPath(data.Path.ValueString())
 
 	// Read the config file
 	config, err := sshconf.ParseConfigFile(path)
@@ -145,25 +135,28 @@ func (r *SSHConfigResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
+	// Preserve the existing ID from state
+	var state SSHConfigResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	data.Id = state.Id
+
 	// Read or create config and apply patch
-	config, err := readOrCreateConfig(data.Path.ValueString())
+	native := data.toValues()
+	config, err := readOrCreateConfig(native.Path)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to read/create SSH config", err.Error())
 		return
 	}
 
-	if err := config.Patch(data.Find.ValueString(), data.Patch.ValueString()); err != nil {
+	if err := config.Patch(native.Find, native.Patch); err != nil {
 		resp.Diagnostics.AddError("Failed to apply SSH config patch", err.Error())
 		return
 	}
 
-	expandedPath, err := expandPath(data.Path.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Path expansion failed", err.Error())
-		return
-	}
-
-	if err := config.WriteFile(expandedPath); err != nil {
+	if err := config.WriteFile(expandPath(native.Path)); err != nil {
 		resp.Diagnostics.AddError("Failed to write SSH config file", err.Error())
 		return
 	}
@@ -195,15 +188,8 @@ func (r *SSHConfigResource) Delete(ctx context.Context, req resource.DeleteReque
 	}
 
 	// Expand the path (handle ~)
-	path := data.Path.ValueString()
-	if path[0] == '~' {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to expand home directory", err.Error())
-			return
-		}
-		path = filepath.Join(home, path[1:])
-	}
+	native := data.toValues()
+	path := expandPath(native.Path)
 
 	// Read the config file
 	config, err := sshconf.ParseConfigFile(path)

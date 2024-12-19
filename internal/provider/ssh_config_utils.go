@@ -3,7 +3,6 @@ package provider
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -11,7 +10,7 @@ import (
 )
 
 // Define the base attributes that will be used in both the main object and children
-var sshConfigLineAttrTypes = map[string]attr.Type{
+var sshConfigLineChildAttrTypes = map[string]attr.Type{
 	"key":          types.StringType,
 	"value":        types.StringType,
 	"indent":       types.StringType,
@@ -20,34 +19,55 @@ var sshConfigLineAttrTypes = map[string]attr.Type{
 	"trail_indent": types.StringType,
 }
 
-// Create the object type with the recursive children structure
+// Create the object type with the non-recursive children structure
 var sshConfigLineObjectType = types.ObjectType{
 	AttrTypes: func() map[string]attr.Type {
 		attrs := make(map[string]attr.Type)
-		for k, v := range sshConfigLineAttrTypes {
+		for k, v := range sshConfigLineChildAttrTypes {
 			attrs[k] = v
 		}
 		attrs["children"] = types.ListType{
 			ElemType: types.ObjectType{
-				AttrTypes: sshConfigLineAttrTypes,
+				AttrTypes: sshConfigLineChildAttrTypes,
 			},
 		}
 		return attrs
 	}(),
 }
 
+func convertSSHConfLineNoChildren(line sshconf.LineNoChildren) SSHConfigLineChild {
+	return SSHConfigLineChild{
+		Key:         types.StringValue(line.Key),
+		Value:       types.StringValue(line.Value),
+		Indent:      types.StringValue(line.Indent),
+		Sep:         types.StringValue(line.Sep),
+		Comment:     types.StringValue(line.Comment),
+		TrailIndent: types.StringValue(line.TrailIndent),
+	}
+}
+
 func convertSSHConfLine(line sshconf.Line) SSHConfigLine {
 	// Convert children to []attr.Value
 	childrenValues := make([]attr.Value, len(line.Children))
 	for i, child := range line.Children {
-		converted := convertSSHConfLine(child)
-		childrenValues[i] = converted.toAttrValue()
+		converted := convertSSHConfLineNoChildren(child)
+		childrenValues[i] = types.ObjectValueMust(
+			sshConfigLineChildAttrTypes,
+			map[string]attr.Value{
+				"key":          converted.Key,
+				"value":        converted.Value,
+				"indent":       converted.Indent,
+				"sep":          converted.Sep,
+				"comment":      converted.Comment,
+				"trail_indent": converted.TrailIndent,
+			},
+		)
 	}
 
 	// Create types.List for children
 	childrenList, _ := types.ListValue(
 		types.ObjectType{
-			AttrTypes: sshConfigLineAttrTypes,
+			AttrTypes: sshConfigLineChildAttrTypes,
 		},
 		childrenValues,
 	)
@@ -79,25 +99,8 @@ func (l SSHConfigLine) toAttrValue() attr.Value {
 	)
 }
 
-// Add these new utility functions
-
-func expandPath(path string) (string, error) {
-	if path[0] == '~' {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("failed to expand home directory: %w", err)
-		}
-		return filepath.Join(home, path[1:]), nil
-	}
-	return path, nil
-}
-
 func readOrCreateConfig(path string) (*sshconf.SSHConfig, error) {
-	expandedPath, err := expandPath(path)
-	if err != nil {
-		return nil, err
-	}
-
+	expandedPath := expandPath(path)
 	config, err := sshconf.ParseConfigFile(expandedPath)
 	if err != nil {
 		if !os.IsNotExist(err) {

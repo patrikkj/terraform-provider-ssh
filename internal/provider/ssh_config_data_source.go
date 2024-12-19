@@ -38,7 +38,9 @@ func (d *SSHConfigDataSource) Read(ctx context.Context, req datasource.ReadReque
 	// Generate a unique ID based on the path and timestamp
 	data.Id = types.StringValue(generateFileID(data.Path.ValueString(), time.Now()))
 
-	config, err := readOrCreateConfig(data.Path.ValueString())
+	path := expandPath(data.Path.ValueString())
+
+	config, err := readOrCreateConfig(path)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to read SSH config", err.Error())
 		return
