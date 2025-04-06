@@ -66,9 +66,6 @@ require (
 	google.golang.org/protobuf v1.35.1 // indirect
 )
 
-require (
-	github.com/joho/godotenv v1.5.1
-	github.com/patrikkj/sshconf v0.0.0
-)
+require github.com/joho/godotenv v1.5.1
 
 replace github.com/patrikkj/sshconf => ../sshconf
