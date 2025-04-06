@@ -62,7 +62,6 @@ func (p *SSHProvider) Resources(ctx context.Context) []func() resource.Resource 
 	return []func() resource.Resource{
 		NewSSHExecResource,
 		NewSSHFileResource,
-		NewSSHConfigResource,
 	}
 }
 
@@ -70,7 +69,6 @@ func (p *SSHProvider) DataSources(ctx context.Context) []func() datasource.DataS
 	return []func() datasource.DataSource{
 		NewSSHExecDataSource,
 		NewSSHFileDataSource,
-		NewSSHConfigDataSource,
 	}
 }
 
