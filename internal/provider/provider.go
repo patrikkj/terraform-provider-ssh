@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package provider
 
 import (
@@ -9,12 +6,38 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/function"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
+	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+type SSHProviderModel struct {
+	SSHConnectionModel
+	Bastion *SSHConnectionModel `tfsdk:"bastion"`
+}
+
+var SSHProviderSchema = schema.Schema{
+	Attributes: map[string]schema.Attribute{
+		"host":        schema.StringAttribute{Description: "The hostname or IP address of the target SSH server", Optional: true},
+		"port":        schema.Int64Attribute{Description: "The port number of the target SSH server", Optional: true},
+		"user":        schema.StringAttribute{Description: "The username for SSH authentication", Optional: true},
+		"password":    schema.StringAttribute{Description: "The password for SSH authentication", Optional: true, Sensitive: true},
+		"private_key": schema.StringAttribute{Description: "The private key for SSH authentication", Optional: true, Sensitive: true},
+		"bastion": schema.SingleNestedAttribute{
+			Description: "Bastion host configuration",
+			Optional:    true,
+			Attributes: map[string]schema.Attribute{
+				"host":        SSHConnectionSchema.Host,
+				"port":        SSHConnectionSchema.Port,
+				"user":        SSHConnectionSchema.User,
+				"password":    SSHConnectionSchema.Password,
+				"private_key": SSHConnectionSchema.PrivateKey,
+			},
+		},
+	},
+}
+
 var _ provider.Provider = &SSHProvider{}
-var _ provider.ProviderWithFunctions = &SSHProvider{}
 
 type SSHProvider struct {
 	version string

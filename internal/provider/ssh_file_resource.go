@@ -6,8 +6,46 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+type SSHFileResourceModel struct {
+	Path            types.String `tfsdk:"path"`
+	Content         types.String `tfsdk:"content"`
+	Permissions     types.String `tfsdk:"permissions"`
+	FailIfAbsent    types.Bool   `tfsdk:"fail_if_absent"`
+	DeleteOnDestroy types.Bool   `tfsdk:"delete_on_destroy"`
+	Id              types.String `tfsdk:"id"`
+
+	// Connection details
+	SSHConnectionModel
+	UseProviderAsBastion types.Bool          `tfsdk:"use_provider_as_bastion"`
+	Bastion              *SSHConnectionModel `tfsdk:"bastion"`
+}
+
+var SSHFileResourceSchema = schema.Schema{
+	Description: "Manage files over SSH with potential side effects",
+	Attributes: map[string]schema.Attribute{
+		"path":              schema.StringAttribute{Required: true, Description: "Path to the file"},
+		"content":           schema.StringAttribute{Required: true, Description: "Content of the file"},
+		"permissions":       schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("0644"), Description: "File permissions (e.g., '0644')"},
+		"fail_if_absent":    schema.BoolAttribute{Optional: true, Description: "Whether to fail if the file does not exist"},
+		"delete_on_destroy": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(true), Description: "Whether to delete the file when the resource is destroyed. Defaults to true."},
+		"id":                schema.StringAttribute{Computed: true, Description: "Unique identifier for this file"},
+
+		// Common SSH connection attributes
+		"host":                    SSHConnectionSchema.Host,
+		"user":                    SSHConnectionSchema.User,
+		"password":                SSHConnectionSchema.Password,
+		"private_key":             SSHConnectionSchema.PrivateKey,
+		"port":                    SSHConnectionSchema.Port,
+		"use_provider_as_bastion": SSHConnectionSchema.UseProviderAsBastion,
+		"bastion":                 SSHConnectionSchema.Bastion,
+	},
+}
 
 var _ resource.Resource = &SSHFileResource{}
 

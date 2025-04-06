@@ -6,8 +6,42 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+type SSHFileDataSourceModel struct {
+	Path         types.String `tfsdk:"path"`
+	Content      types.String `tfsdk:"content"`
+	Permissions  types.String `tfsdk:"permissions"`
+	FailIfAbsent types.Bool   `tfsdk:"fail_if_absent"`
+	Id           types.String `tfsdk:"id"`
+
+	// Connection details
+	SSHConnectionModel
+	UseProviderAsBastion types.Bool          `tfsdk:"use_provider_as_bastion"`
+	Bastion              *SSHConnectionModel `tfsdk:"bastion"`
+}
+
+var SSHFileDataSourceSchema = schema.Schema{
+	Description: "Read files over SSH",
+	Attributes: map[string]schema.Attribute{
+		"path":           schema.StringAttribute{Required: true, Description: "Path to the file"},
+		"content":        schema.StringAttribute{Computed: true, Description: "Content of the file"},
+		"permissions":    schema.StringAttribute{Computed: true, Optional: true, Description: "File permissions (e.g., '0644')"},
+		"fail_if_absent": schema.BoolAttribute{Optional: true, Description: "Whether to fail if the file does not exist"},
+		"id":             schema.StringAttribute{Computed: true, Description: "Unique identifier for this file"},
+
+		// Common SSH connection attributes
+		"host":                    SSHConnectionSchema.Host,
+		"user":                    SSHConnectionSchema.User,
+		"password":                SSHConnectionSchema.Password,
+		"private_key":             SSHConnectionSchema.PrivateKey,
+		"port":                    SSHConnectionSchema.Port,
+		"use_provider_as_bastion": SSHConnectionSchema.UseProviderAsBastion,
+		"bastion":                 SSHConnectionSchema.Bastion,
+	},
+}
 
 var _ datasource.DataSource = &SSHFileDataSource{}
 
