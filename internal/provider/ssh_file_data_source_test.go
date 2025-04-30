@@ -18,16 +18,12 @@ func TestAccSSHFileDataSource(t *testing.T) {
 				Config: testAccSSHFileDataSourceConfig(t),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Test reading an existing file
-					resource.TestCheckResourceAttr("data.ssh_file.hostname", "path", "/etc/hostname"),
-					resource.TestCheckResourceAttrSet("data.ssh_file.hostname", "content"),
+					resource.TestCheckResourceAttr("data.ssh_file.hosts", "path", "/etc/hosts"),
+					resource.TestCheckResourceAttrSet("data.ssh_file.hosts", "content"),
 
 					// Test reading a non-existent file with fail_if_absent = false
 					resource.TestCheckResourceAttr("data.ssh_file.missing_optional", "path", "/nonexistent/file"),
 					resource.TestCheckResourceAttr("data.ssh_file.missing_optional", "content", ""),
-
-					// Test reading /etc/hosts file
-					resource.TestCheckResourceAttr("data.ssh_file.hosts", "path", "/etc/hosts"),
-					resource.TestCheckResourceAttrSet("data.ssh_file.hosts", "content"),
 				),
 			},
 		},
@@ -40,10 +36,6 @@ provider "ssh" {
 	host     = "%s"
 	user     = "%s"
 	password = "%s"
-}
-
-data "ssh_file" "hostname" {
-	path = "/etc/hostname"
 }
 
 data "ssh_file" "missing_optional" {
